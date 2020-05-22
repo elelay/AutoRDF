@@ -24,7 +24,13 @@ public:
 
     void generateDefinition(std::ostream& ofs, const Klass& onClass) const;
 
-    void generateKeyDeclaration(std::ostream& ofs, const Klass& onClass) const;
+    void generateKeyDeclaration(std::ostream& ofs, const Klass& onClass, size_t propIndex, size_t propCount) const;
+
+    int generateSetIndices(std::ostream& ofs, const Klass& onClass, int i) const;
+
+    std::string name() const {
+    	return _decorated.prettyIRIName();
+    }
 
 private:
     std::pair<cvt::RdfTypeEnum, std::string> getRdfCppTypes(const Klass& onClass) const;
@@ -40,6 +46,8 @@ private:
     void generateSetterForMany(std::ostream& ofs, const Klass& onClass) const;
 
     void generateRemover(std::ostream& ofs, const Klass& onClass) const;
+
+    void generateStorage(std::ostream& ofs, const Klass& onClass, bool optional, bool forMany) const;
 
     std::string orderedBoolValue() const;
 };

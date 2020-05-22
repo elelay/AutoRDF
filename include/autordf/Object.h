@@ -81,7 +81,7 @@ public:
      * @param rdfTypeIRI If not empty, will write rdf type property when object is written
      * not empty
      */
-    AUTORDF_EXPORT Object(const Uri& iri = "", const Uri& rdfTypeIRI = "");
+    AUTORDF_EXPORT Object(const Uri& iri = "", const Uri& rdfTypeIRI = "", uint64_t klass = 0, uint64_t identity = 0);
 
     /**
      * Build us using the same underlying resource as the other object
@@ -548,6 +548,9 @@ private:
      * The resource this object is based on
      */
     Resource _r;
+
+    uint64_t _klass;
+    uint64_t _identity;
 
     /**
      * The factory this object belongs to. Factory used for this object is found at the top of the stack

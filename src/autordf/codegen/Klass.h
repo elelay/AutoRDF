@@ -37,6 +37,9 @@ public:
     void leaveNameSpace(std::ofstream& ofs) const;
 
     Klass uri2Klass(const std::string& uri) const;
+
+    size_t propCount() const;
+
 private:
 };
 

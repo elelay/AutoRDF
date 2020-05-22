@@ -33,14 +33,14 @@ void Object::popFactory() {
     _factories.pop();
 }
 
-Object::Object(const Uri &iri, const Uri& rdfTypeIRI) : _r(iri.empty() ? factory()->createBlankNodeResource() :factory()->createIRIResource(iri)) {
+Object::Object(const Uri &iri, const Uri& rdfTypeIRI, uint64_t klass, uint64_t identity) : _r(iri.empty() ? factory()->createBlankNodeResource() :factory()->createIRIResource(iri)), _klass(klass), _identity(identity) {
     construct(rdfTypeIRI);
 }
 
-Object::Object(const Object& other) : _r(other._r), _rdfTypeWritingRequired(other._rdfTypeWritingRequired), _rdfTypeIRI(other._rdfTypeIRI) {
+Object::Object(const Object& other) : _r(other._r), _klass(other._klass), _identity(other._identity), _rdfTypeWritingRequired(other._rdfTypeWritingRequired), _rdfTypeIRI(other._rdfTypeIRI) {
 }
 
-Object::Object(Resource r, const Uri& rdfTypeIRI) : _r(r) {
+Object::Object(Resource r, const Uri& rdfTypeIRI) : _r(r), _klass(0), _identity(0) {
     construct(rdfTypeIRI);
 }
 
