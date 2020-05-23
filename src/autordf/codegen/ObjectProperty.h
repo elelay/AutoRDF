@@ -32,6 +32,14 @@ public:
     	return _decorated.prettyIRIName();
     }
 
+    uint64_t storageSize(const Klass&) const {
+    	return 2;
+    }
+
+    void generateSaverValuesDecl(std::ostream& ofs, const Klass& onClass) const;
+
+    void generateSaverValuesSet(std::ostream& ofs, const Klass& onClass) const;
+
 private:
     /**
      * Gets the class for this property, when instanciated as class "onClass" attribute

@@ -28,9 +28,15 @@ public:
 
     int generateSetIndices(std::ostream& ofs, const Klass& onClass, int i) const;
 
+    void generateSaverValuesDecl(std::ostream& ofs, const Klass& onClass) const;
+
+    void generateSaverValuesSet(std::ostream& ofs, const Klass& onClass) const;
+
     std::string name() const {
     	return _decorated.prettyIRIName();
     }
+
+    uint64_t storageSize(const Klass& onClass) const;
 
 private:
     std::pair<cvt::RdfTypeEnum, std::string> getRdfCppTypes(const Klass& onClass) const;

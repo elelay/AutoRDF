@@ -15,7 +15,7 @@ Klass Klass::uri2Klass(const std::string& uri) const {
     return Klass(*_decorated.ontology()->findClass(uri));
 }
 
-void Klass::generateDeclaration() const {
+void Klass::generateDeclaration(uint64_t iKlass, const std::set<uint64_t>& descendants) const {
     std::string cppName = _decorated.prettyIRIName();
     std::ofstream ofs;
     createFile(genCppNameSpaceInclusionPath() + "/" + cppName + ".h", &ofs);
@@ -25,6 +25,7 @@ void Klass::generateDeclaration() const {
     ofs << "#include <set>" << std::endl;
     ofs << "#include <iosfwd>" << std::endl;
     ofs << "#include <autordf/Object.h>" << std::endl;
+    ofs << "#include <All.h>" << std::endl;
     ofs << "#include <" << genCppNameSpaceInclusionPath() << "/I" << cppName << ".h>" << std::endl;
     for ( auto const& ancestor: _decorated.getAllAncestors() ) {
         ofs << "#include <" << uri2Klass(ancestor->rdfname()).genCppNameSpaceInclusionPath() << "/I" <<
@@ -77,8 +78,9 @@ void Klass::generateDeclaration() const {
     // ofs << std::endl;
 
 
-    indent(ofs, 1) << "explicit " << cppName << "(uint64_t storageIndex): storageIndex(storageIndex) {" << std::endl;
+    indent(ofs, 1) << "explicit " << cppName << "(uint64_t klassId, uint64_t storageIndex): autordf::Object(\"\", \"\", klassId, storageIndex) {" << std::endl;
     int i = 1;
+    indent(ofs, 2) << "uint64_t* base_ptr = All::INSTANCES[klassId] + (storageIndex + All::PARENT_OFFSET[klassId][" << cppName << "::KLASS_ID]);" << std::endl;
     for ( auto const& ancestor: _decorated.getAllAncestors() ) {
     	indent(ofs, 2) << "// " << ancestor->prettyIRIName() << " fields" << std::endl;
 		for ( const std::shared_ptr<ontology::DataProperty>& prop : ancestor->dataProperties()) {
@@ -87,8 +89,14 @@ void Klass::generateDeclaration() const {
 		for ( const std::shared_ptr<ontology::ObjectProperty>& prop : ancestor->objectProperties()) {
 			i = ObjectProperty(*prop.get()).generateSetIndices(ofs, Klass(*ancestor.get()), i);
 		}
-
     }
+	indent(ofs, 2) << "// " << _decorated.prettyIRIName() << " fields" << std::endl;
+	for ( const std::shared_ptr<ontology::DataProperty>& prop : _decorated.dataProperties()) {
+		i = DataProperty(*prop.get()).generateSetIndices(ofs, *this, i);
+	}
+	for ( const std::shared_ptr<ontology::ObjectProperty>& prop : _decorated.objectProperties()) {
+		i = ObjectProperty(*prop.get()).generateSetIndices(ofs, *this, i);
+	}
     indent(ofs, 1) << "}" << std::endl;
     ofs << std::endl;
     
@@ -98,40 +106,43 @@ void Klass::generateDeclaration() const {
     indent(ofs, 1) << "static std::vector<" << cppName << "> find();" << std::endl;
     ofs << std::endl;
 
-	size_t props = propCount();
+	size_t sz = storageSize();
 
-    indent(ofs, 1) << "static " << cppName << " instance(uint64_t storageIndex) {" << std::endl;
-    indent(ofs, 2) << "return " << cppName << "(storageIndex * " << props << ");" << std::endl;
-    indent(ofs, 1) << "}" << std::endl;
-    ofs << std::endl;
+    // indent(ofs, 1) << "static " << cppName << " instance(uint64_t klassId, uint64_t storageIndex) {" << std::endl;
+    // indent(ofs, 2) << "// FIXME: use klassId" << std::endl;
+    // indent(ofs, 2) << "return " << cppName << "(storageIndex * " << sz << ");" << std::endl;
+    // indent(ofs, 1) << "}" << std::endl;
+    // ofs << std::endl;
 
-    indent(ofs, 1) << "static std::shared_ptr<" << cppName << "> instancePtr(uint64_t storageIndex) {" << std::endl;
-    indent(ofs, 2) << "return std::make_shared<" << cppName << ">(storageIndex);" << std::endl;
-    indent(ofs, 1) << "}" << std::endl;
-    ofs << std::endl;
+    // indent(ofs, 1) << "static std::shared_ptr<" << cppName << "> instancePtr(uint64_t klassId, uint64_t storageIndex) {" << std::endl;
+    // indent(ofs, 2) << "// FIXME: use klassId" << std::endl;
+    // indent(ofs, 2) << "return std::make_shared<" << cppName << ">(storageIndex * " << sz << ");" << std::endl;
+    // indent(ofs, 1) << "}" << std::endl;
+    // ofs << std::endl;
 
-    indent(ofs, 1) << "static std::vector<" << cppName << "> instances(uint64_t* storageBegin, uint64_t storageLength) {" << std::endl;
-    indent(ofs, 2) << "std::vector<" << cppName << "> ret;" << std::endl;
-    indent(ofs, 2) << "ret.reserve(storageLength);" << std::endl;
-    indent(ofs, 2) << "for (size_t i=0; i < storageLength; i++) {" << std::endl;
-    indent(ofs, 3) << "ret.emplace_back(" << cppName << "::instance(*(storageBegin + i)));" << std::endl;
-    indent(ofs, 2) << "}" << std::endl;
-    indent(ofs, 2) << "return ret;" << std::endl;
-    indent(ofs, 1) << "}" << std::endl;
-    ofs << std::endl;
+    // indent(ofs, 1) << "static std::vector<" << cppName << "> instances(uint64_t* klassIdStorageBegin, uint64_t* identityStorageBegin, uint64_t storageLength) {" << std::endl;
+    // indent(ofs, 2) << "std::vector<" << cppName << "> ret;" << std::endl;
+    // indent(ofs, 2) << "ret.reserve(storageLength);" << std::endl;
+    // indent(ofs, 2) << "for (size_t i=0; i < storageLength; i++) {" << std::endl;
+    // indent(ofs, 3) << "ret.push_back(" << cppName << "::instance(*(klassIdStorageBegin + i), *(identityStorageBegin + i)));" << std::endl;
+    // indent(ofs, 2) << "}" << std::endl;
+    // indent(ofs, 2) << "return ret;" << std::endl;
+    // indent(ofs, 1) << "}" << std::endl;
+    // ofs << std::endl;
 
 	size_t propIndex = 0;
     for ( const std::shared_ptr<ontology::DataProperty>& key : _decorated.dataKeys()) {
-        DataProperty(*key.get()).generateKeyDeclaration(ofs, _decorated, propIndex++, props);
+    	DataProperty dp(*key.get());
+        dp.generateKeyDeclaration(ofs, _decorated, propIndex, sz);
+        propIndex += dp.storageSize(_decorated);
     }
 
     for ( const std::shared_ptr<ontology::ObjectProperty>& key : _decorated.objectKeys()) {
-        ObjectProperty(*key.get()).generateKeyDeclaration(ofs, _decorated, propIndex++, props);
+        ObjectProperty op(*key.get());
+        op.generateKeyDeclaration(ofs, _decorated, propIndex, sz);
+        propIndex += op.storageSize(_decorated);
     }
 
-	indent(ofs, 1) << "uint64_t instanceIndex() const {" << std::endl;
-	indent(ofs, 2) << "return storageIndex;" << std::endl;
-	indent(ofs, 1) << "}" << std::endl;
 	ofs << std::endl;
 
 	indent(ofs, 1) << "static void initInstances(uint64_t* storage, size_t len);\n" << std::endl;
@@ -142,9 +153,9 @@ void Klass::generateDeclaration() const {
     // indent(ofs, 1) << "Object& object() override { return *this; }" << std::endl;
     // indent(ofs, 1) << "const Object& object() const override { return *this; }" << std::endl;
 
+	indent(ofs, 1) << "static uint64_t KLASS_ID;" << std::endl;
 	indent(ofs, 1) << "static uint64_t* INSTANCES;" << std::endl;
 	indent(ofs, 1) << "static size_t INSTANCES_LENGTH;" << std::endl;
-	indent(ofs, 1) << " uint64_t storageIndex = 0;" << std::endl;
 
     ofs << "};" << std::endl;
     ofs << std::endl;
@@ -155,17 +166,21 @@ void Klass::generateDeclaration() const {
 
     ofs << "namespace autordf {" << std::endl;
     ofs << "template<> inline " << genCppNameSpaceFullyQualified() << "::" << cppName  << " autordf::Object::as() {" << std::endl;
-    indent(ofs, 1) << "return " << genCppNameSpaceFullyQualified() << "::" << cppName << "(0);" << std::endl;
+    indent(ofs, 1) << "return " << genCppNameSpaceFullyQualified() << "::" << cppName << "(_klass, _identity);" << std::endl;
     ofs << "}" << std::endl;
     ofs << "template<> inline bool autordf::Object::isA<" << genCppNameSpaceFullyQualified() << "::" << cppName   << ">() const {" << std::endl;
-    indent(ofs, 1) << "return false;" << std::endl;
+    indent(ofs, 1) << "return (_klass == " << iKlass << ")";
+    for (uint64_t d: descendants) {
+    	ofs << " || (_klass == " << d << ")";
+    }
+    ofs << ";" << std::endl;
     ofs << "}" << std::endl;
     ofs << "}" << std::endl;
 
     generateCodeProtectorEnd(ofs, genCppNameSpaceFullyQualified(), cppName);
 }
 
-void Klass::generateDefinition() const {
+void Klass::generateDefinition(uint64_t iKlass) const {
     std::string cppName = _decorated.prettyIRIName();
     std::string cppNameSpace = genCppNameSpaceFullyQualified();
     std::ofstream ofs;
@@ -190,24 +205,28 @@ void Klass::generateDefinition() const {
     // ofs << "}" << std::endl;
     // ofs << std::endl;
 
+	ofs << "uint64_t " << cppName << "::KLASS_ID = " << iKlass <<";" << std::endl;
 	ofs << "uint64_t* " << cppName << "::INSTANCES = nullptr;" << std::endl;
 	ofs << "size_t " << cppName << "::INSTANCES_LENGTH = 0;" << std::endl;
 
 	ofs << "void " << cppName << "::initInstances(uint64_t* storage, size_t len) {" << std::endl;
 	indent(ofs, 1) << "INSTANCES = storage;" << std::endl;
 	indent(ofs, 1) << "INSTANCES_LENGTH = len;" << std::endl;
+	indent(ofs, 1) << "All::INSTANCES[" << cppName << "::KLASS_ID] = storage;" << std::endl;
+	
 	ofs << "}" << std::endl;
 	ofs << std::endl;
 
-	size_t objSize = propCount() + 1; // +1 for identity field
+	size_t objSize = storageSize();
 
     ofs << "std::vector<" << cppName << "> " << cppName << "::find() {" << std::endl;
     // indent(ofs, 1) << "return findHelper<" << cppName << ">(I" << cppName << "::TYPEIRI);" << std::endl;
     indent(ofs, 1) << "std::vector<" << cppName << "> ret;" << std::endl;
     indent(ofs, 1) << "ret.reserve((INSTANCES_LENGTH - 1) / " << objSize << ");" << std::endl;
     indent(ofs, 1) << "for (size_t i=1; i < INSTANCES_LENGTH; i += " << objSize << ") {" << std::endl;
-    indent(ofs, 2) << "ret.emplace_back(" << cppName << "::instance(i));" << std::endl;
+    indent(ofs, 2) << "ret.emplace_back(" << cppName << "::KLASS_ID, " << "i);" << std::endl;
     indent(ofs, 1) << "}" << std::endl;
+    // FIXME: find should return subclasses ?
     indent(ofs, 1) << "return ret;" << std::endl;
     ofs << "}" << std::endl;
     ofs << std::endl;
@@ -480,11 +499,19 @@ void Klass::leaveNameSpace(std::ofstream& ofs) const {
     }
 }
 
-size_t Klass::propCount() const {
+size_t Klass::storageSize() const {
     int i = 0;
     for ( auto const& ancestor: _decorated.getAllAncestors() ) {
-		i += ancestor->dataProperties().size() + ancestor->objectProperties().size();
-	}
+		for ( const std::shared_ptr<ontology::DataProperty>& prop : ancestor->dataProperties()) {
+			i += DataProperty(*prop.get()).storageSize(Klass(*ancestor.get()));
+		}
+		for ( const std::shared_ptr<ontology::ObjectProperty>& prop : ancestor->objectProperties()) {
+			i += ObjectProperty(*prop.get()).storageSize(Klass(*ancestor.get()));
+		}
+    }
+    if (i == 0) {
+    	i+= 1; // instances can't be empty, even if no property
+    }
 	return i;
 }
 

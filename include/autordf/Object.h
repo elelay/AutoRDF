@@ -107,6 +107,15 @@ public:
      */
     AUTORDF_EXPORT std::string QName() const;
 
+
+    AUTORDF_EXPORT uint64_t klass() const {
+    	return _klass;
+    }
+
+    AUTORDF_EXPORT uint64_t identity() const {
+    	return _identity;
+    }
+
     /**
      * Return types of current object.
      * If namespaceFilter is set, only types in this namespace will be returned

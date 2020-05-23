@@ -29,16 +29,16 @@ public:
 
     void generateInterfaceDefinition() const;
 
-    void generateDeclaration() const;
+    void generateDeclaration(uint64_t iKlass, const std::set<uint64_t>& descendants) const;
 
-    void generateDefinition() const;
+    void generateDefinition(uint64_t iKlass) const;
 
     void enterNameSpace(std::ofstream& ofs) const;
     void leaveNameSpace(std::ofstream& ofs) const;
 
     Klass uri2Klass(const std::string& uri) const;
 
-    size_t propCount() const;
+    size_t storageSize() const;
 
 private:
 };
