@@ -52,13 +52,19 @@ void ObjectProperty::generateDeclaration(std::ostream& ofs, const Klass& onClass
 }
 
 void ObjectProperty::generateStorage(std::ostream& ofs, const Klass& onClass, bool forMany) const {
-	indent(ofs, 1) << "static void initS_" << _decorated.prettyIRIName() << "(uint64_t* klassIdStorage, uint64_t* identityStorage);\n" << std::endl;
+	indent(ofs, 1) << "static void initS_" << _decorated.prettyIRIName() << "(uint64_t* klassIdStorage, uint64_t* identityStorage";
+	if (forMany) {
+		ofs << ", uint64_t* arrStorage";
+	}
+	ofs << ", size_t len);\n" << std::endl;
 
 	ofs << "protected:" << std::endl;
 	indent(ofs, 1) << "static uint64_t* SK_" << _decorated.prettyIRIName() << ";" << std::endl;
 	indent(ofs, 1) << "static uint64_t* SI_" << _decorated.prettyIRIName() << ";" << std::endl;
+	indent(ofs, 1) << "static size_t SL_" << _decorated.prettyIRIName() << ";" << std::endl;
 	indent(ofs, 1) << "uint64_t i_" << _decorated.prettyIRIName() << ";" << std::endl;
 	if (forMany) {
+    	indent(ofs, 1) << "static uint64_t* SARR_" << _decorated.prettyIRIName() << ";" << std::endl;
 		indent(ofs, 1) << "uint64_t c_" << _decorated.prettyIRIName() << ";" << std::endl;
 	}
 	ofs << std::endl;
@@ -103,16 +109,31 @@ void ObjectProperty::generateKeyDeclaration(std::ostream& ofs, const Klass& onCl
 void ObjectProperty::generateDefinition(std::ostream& ofs, const Klass& onClass) const {
     auto propertyClass = effectiveClass(onClass);
     std::string currentClassName = "I" + onClass.decorated().prettyIRIName();
+    bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
 
     ofs << "const autordf::Uri " << currentClassName << "::" << _decorated.prettyIRIName() << "ObjectPropertyIri = \"" << _decorated.rdfname() << "\";" << std::endl;
     ofs << std::endl;
 
+	if (forMany) {
+    	ofs << "uint64_t* " << currentClassName << "::SARR_" << _decorated.prettyIRIName() << " = 0;" << std::endl;
+	}
+
 	ofs << "uint64_t* " << currentClassName << "::SK_" << _decorated.prettyIRIName() << " = nullptr;" << std::endl;
 	ofs << "uint64_t* " << currentClassName << "::SI_" << _decorated.prettyIRIName() << " = nullptr;" << std::endl;
+	ofs << "uint64_t " << currentClassName << "::SL_" << _decorated.prettyIRIName() << " = 0;" << std::endl;
 
-	ofs << "void " << currentClassName << "::initS_" << _decorated.prettyIRIName() << "(uint64_t* klassIdStorage, uint64_t* identityStorage) {" << std::endl;
+	ofs << "void " << currentClassName << "::initS_" << _decorated.prettyIRIName() << "(uint64_t* klassIdStorage, uint64_t* identityStorage";
+	if (forMany) {
+		ofs << ", uint64_t* arrStorage";
+	}
+	ofs << ", size_t len) {" << std::endl;
+
 	indent(ofs, 1) << "SK_" << _decorated.prettyIRIName() << " = klassIdStorage;" << std::endl;
 	indent(ofs, 1) << "SI_" << _decorated.prettyIRIName() << " = identityStorage;" << std::endl;
+	if (forMany) {
+		indent(ofs, 1) << "SARR_" << _decorated.prettyIRIName() << " = arrStorage;" << std::endl;
+	}
+	indent(ofs, 1) << "SL_" << _decorated.prettyIRIName() << " = len;" << std::endl;
 	ofs << "}" << std::endl;
 	ofs << std::endl;
 
@@ -150,9 +171,10 @@ void ObjectProperty::generateDefinition(std::ostream& ofs, const Klass& onClass)
 		indent(ofs, 1) << "std::vector<" << propertyClass.genCppNameWithNamespace() << "> ret;" << std::endl;
 		indent(ofs, 1) << "ret.reserve(" << "c_" << _decorated.prettyIRIName() << ");" << std::endl;
 		indent(ofs, 1) << "for (uint64_t i=0; i < c_" << _decorated.prettyIRIName() << "; i++) {" << std::endl;
+		indent(ofs, 2) << "uint64_t j = SARR_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << " + i];" << std::endl;
 		indent(ofs, 2) << "ret.emplace_back("
-			<< "SK_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << " + i]"
-			<< ", SI_" << _decorated.prettyIRIName()  << "[i_" << _decorated.prettyIRIName() << " + i]"
+			<< "SK_" << _decorated.prettyIRIName() << "[j]"
+			<< ", SI_" << _decorated.prettyIRIName()  << "[j]"
 			<< ");" << std::endl;
 		indent(ofs, 1) << "}" << std::endl;
 		indent(ofs, 1) << "return ret;" << std::endl;
@@ -273,6 +295,9 @@ void ObjectProperty::generateSaverValuesDecl(std::ostream& ofs, const Klass& onC
     auto propertyClass = effectiveClass(onClass);
     std::string currentClassName = onClass.decorated().prettyIRIName();
 	indent(ofs, 1) << "std::set<" << propertyClass.genCppNameWithNamespace(false) << "> " << currentClassName << "_" << name() << "_values;" << std::endl;
+    if (_decorated.maxCardinality(onClass.decorated()) > 1) {
+        indent(ofs, 1) << "std::vector<uint64_t> " << currentClassName << "_" << name() << "_ARR;" << std::endl;
+    }
 }
 
 void ObjectProperty::generateSaverValuesSet(std::ostream& ofs, const Klass& onClass) const {
@@ -296,6 +321,97 @@ void ObjectProperty::generateSaverValuesSet(std::ostream& ofs, const Klass& onCl
 		indent(ofs, 3) << currentClassName << "_" << name() << "_values.insert(p);" << std::endl;
 		indent(ofs, 2) << "}" << std::endl;
 	}
+}
+
+int ObjectProperty::generateSaverInstanceSave(std::ostream& ofs, const Klass& onClass, const Klass& storageClass, int propOffset) const {
+    std::string storageClassName = storageClass.decorated().prettyIRIName();
+    std::string currentClassName = onClass.decorated().prettyIRIName();
+    auto propertyClass = effectiveClass(onClass);
+
+	indent(ofs, 2) << "{ // " << currentClassName << " " << storageClassName << "::" << _decorated.prettyIRIName() << std::endl;
+	if (_decorated.maxCardinality(onClass.decorated()) <= 1) {
+		if (_decorated.minCardinality(onClass.decorated()) > 0) {
+			indent(ofs, 3) << "uint64_t i=1;" << std::endl;
+			indent(ofs, 3) << "auto const& objV = obj." << _decorated.prettyIRIName() << "());" << std::endl;
+			indent(ofs, 3) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+			indent(ofs, 4) << "if (objV == v) {" << std::endl;
+			indent(ofs, 5) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = i;" << std::endl;
+			indent(ofs, 5) << "break;" << std::endl;
+			indent(ofs, 4) << "}" << std::endl;
+			indent(ofs, 4) << "i++;" << std::endl;
+			indent(ofs, 3) << "}" << std::endl;
+		} else {
+			indent(ofs, 3) << "std::shared_ptr<" << propertyClass.genCppNameWithNamespace(false) << "> tmp = obj." << _decorated.prettyIRIName() << "Optional();" << std::endl;
+			indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = 0;" << std::endl;
+			indent(ofs, 3) << "if (tmp) {" << std::endl;
+			indent(ofs, 4) << "uint64_t i=1;" << std::endl;
+			indent(ofs, 4) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+			indent(ofs, 5) << "if (*tmp == v) {" << std::endl;
+			indent(ofs, 6) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = i;" << std::endl;
+			indent(ofs, 6) << "break;" << std::endl;
+			indent(ofs, 5) << "}" << std::endl;
+			indent(ofs, 5) << "i++;" << std::endl;
+			indent(ofs, 4) << "}" << std::endl;
+			indent(ofs, 3) << "}" << std::endl;
+		}
+	} else {  // maxCardinality > 1
+		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = " << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.size();" << std::endl;
+		indent(ofs, 3) << "uint64_t j=0;" << std::endl;
+		indent(ofs, 3) << "for(auto const& p: obj." << _decorated.prettyIRIName() << "List()) {" << std::endl;
+			indent(ofs, 4) << "uint64_t i=1;" << std::endl;
+			indent(ofs, 4) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+				indent(ofs, 5) << "if (p == v) {" << std::endl;
+					indent(ofs, 6) << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.push_back(i);" << std::endl;
+					indent(ofs, 6) << "break;" << std::endl;
+				indent(ofs, 5) << "}" << std::endl;
+				indent(ofs, 5) << "i++;" << std::endl;
+			indent(ofs, 4) << "}" << std::endl;
+			indent(ofs, 4) << "j++;" << std::endl;
+		indent(ofs, 3) << "}" << std::endl;
+		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1)  << "] = j;" << std::endl;
+	}
+	indent(ofs, 2) << "}" << std::endl;
+	return propOffset + storageSize(onClass);
+}
+
+void ObjectProperty::generateSaverGenLoaderData(std::ostream& ofs, const Klass& onClass) const {
+    std::string storageClassName = onClass.decorated().prettyIRIName();
+    bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
+
+	indent(ofs, 1) << "ofs << \"static const size_t " << storageClassName << "_SL_" << _decorated.prettyIRIName() << " = " << storageClassName << "_" << name() << "_values.size();\\n\";" << std::endl;
+	indent(ofs, 1) << "ofs << \"static uint64_t " << storageClassName << "_SK_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+	indent(ofs, 2) << "ofs << \", \" << allObjectKlassIds[v] << std::endl;" << std::endl;
+	indent(ofs, 1) << "}" << std::endl;
+	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+
+	indent(ofs, 1) << "ofs << \"static uint64_t " << storageClassName << "_SI_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+	indent(ofs, 2) << "ofs << \", \" << allObjectIdentities[v] << std::endl;" << std::endl;
+	indent(ofs, 1) << "}" << std::endl;
+	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+	if (forMany) {
+    	indent(ofs, 1) << "ofs << \"static uint64_t " << storageClassName << "_SARR_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_ARR) {" << std::endl;
+    	indent(ofs, 2) << "ofs << \", \" << v << std::endl;" << std::endl;
+    	indent(ofs, 1) << "}" << std::endl;
+    	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+	}
+}
+
+void ObjectProperty::generateSaverGenLoaderLoad(std::ostream& ofs, const Klass& onClass) const {
+    std::string storageClassName = onClass.decorated().prettyIRIName();
+    bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
+	indent(ofs, 1) << "ofs << \"" << storageClassName << "::initS_" << _decorated.prettyIRIName() << "("
+			<< storageClassName << "_SK_" << _decorated.prettyIRIName()
+			<< ", " << storageClassName << "_SI_" << _decorated.prettyIRIName();
+	if (forMany) {
+		 ofs << ", " << storageClassName << "_SARR_" << _decorated.prettyIRIName();
+	}
+	ofs << ", " << storageClassName << "_SL_" << _decorated.prettyIRIName() << ");\\n\";" << std::endl;
 }
 
 std::string ObjectProperty::orderedBoolValue() const {

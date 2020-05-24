@@ -32,6 +32,12 @@ public:
 
     void generateSaverValuesSet(std::ostream& ofs, const Klass& onClass) const;
 
+    int generateSaverInstanceSave(std::ostream& ofs, const Klass& onClass, const Klass& storageClass, int propOffset) const;
+
+	void generateSaverGenLoaderData(std::ostream& ofs, const Klass& onClass) const;
+
+	void generateSaverGenLoaderLoad(std::ostream& ofs, const Klass& onClass) const;
+
     std::string name() const {
     	return _decorated.prettyIRIName();
     }

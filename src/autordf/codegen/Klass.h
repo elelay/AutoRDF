@@ -29,7 +29,7 @@ public:
 
     void generateInterfaceDefinition() const;
 
-    void generateDeclaration(uint64_t iKlass, const std::set<uint64_t>& descendants) const;
+    void generateDeclaration(uint64_t iKlass) const;
 
     void generateDefinition(uint64_t iKlass) const;
 
@@ -37,6 +37,12 @@ public:
     void leaveNameSpace(std::ofstream& ofs) const;
 
     Klass uri2Klass(const std::string& uri) const;
+
+    void generateSaverInstanceSave(std::ofstream& ofs, uint64_t iKlass) const;
+    void generateSaverInitKlassIdsIdentities(std::ofstream& ofs, uint64_t iKlass) const;
+
+	void generateSaverGenLoaderData(std::ostream& ofs, uint64_t iKlass) const;
+	void generateSaverGenLoaderLoad(std::ostream& ofs, uint64_t iKlass) const;
 
     size_t storageSize() const;
 

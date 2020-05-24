@@ -34,7 +34,7 @@ bool generateAllInOne = false;
 // }
 
 // void makeKlassTree(KlassNode& n, const std::map<uint64_t, std::set<uint64_t>>& klassDescendants, const std::map<uint64_t, autordf::Uri>& indexKlasses) {
-	
+
 // }
 
 void run(Factory *f) {
@@ -104,7 +104,7 @@ void run(Factory *f) {
 
         Klass(*klassMapItem.second).generateInterfaceDeclaration();
         Klass(*klassMapItem.second).generateInterfaceDefinition();
-        Klass(*klassMapItem.second).generateDeclaration(iKlass, klassDescendants[iKlass]);
+        Klass(*klassMapItem.second).generateDeclaration(iKlass);
         Klass(*klassMapItem.second).generateDefinition(iKlass);
     }
 
@@ -152,11 +152,15 @@ void run(Factory *f) {
         generateCodeProtectorBegin(ofs, "ALL", "ALL");
         ofs << std::endl;
         ofs << "#include <cstdint>" << std::endl;
+        ofs << "#include <map>" << std::endl;
+        ofs << std::endl;
+        ofs << "#include <autordf/Uri.h>" << std::endl;
         ofs << std::endl;
 		ofs << "class All {" << std::endl;
 		ofs << "public:" << std::endl;
 		indent(ofs, 1) << "static uint64_t* INSTANCES[" << (klassCount + 1) << "];" << std::endl; // 0 is invalid
 		indent(ofs, 1) << "static uint64_t PARENT_OFFSET[" << (klassCount + 1) << "][" << (klassCount + 1) << "];" << std::endl; // 0 is invalid
+		indent(ofs, 1) << "static std::map<autordf::Uri, std::pair<uint64_t, uint64_t>> URI_TO_OBJECT;" << std::endl;
 		ofs << std::endl;
 		ofs << "};" << std::endl;
         generateCodeProtectorEnd(ofs, "ALL", "ALL");
@@ -201,6 +205,7 @@ void run(Factory *f) {
 		}
 		ofs << "\n};" << std::endl;
 
+		ofs << "std::map<autordf::Uri, std::pair<uint64_t, uint64_t>> All::URI_TO_OBJECT;" << std::endl;
 		ofs << std::endl;
     }
 
@@ -212,11 +217,12 @@ void run(Factory *f) {
         generateCodeProtectorBegin(ofs, "ALL", "Saver");
         ofs << std::endl;
         ofs << "#include <cstdint>" << std::endl;
+		ofs << "#include <string>" << std::endl;
 		ofs << "#include <vector>" << std::endl;
         ofs << std::endl;
 		ofs << "class Saver {" << std::endl;
 		ofs << "public:" << std::endl;
-		indent(ofs, 1) << "static std::vector<uint8_t> saveAll();" << std::endl;
+		indent(ofs, 1) << "static void saveAll(const std::string& outdir);" << std::endl;
 		ofs << "};" << std::endl;
         generateCodeProtectorEnd(ofs, "ALL", "Saver");
     }
@@ -240,11 +246,20 @@ void run(Factory *f) {
 		}
 		ofs << std::endl;
 
-		ofs << "std::vector<uint8_t> Saver::saveAll() {" << std::endl;
+
+		ofs << "void createFile(const std::string& fileName, std::ofstream *ofs) {\n"
+				"	ofs->open(fileName);\n"
+				"	if (!ofs->is_open()) {\n"
+				"		throw std::runtime_error(\"Unable to open \" + fileName + \" file\");\n"
+				"	}\n"
+				"}\n" << std::endl;
+
+		ofs << "void Saver::saveAll(const std::string& outdir) {" << std::endl;
 
 		indent(ofs, 1) << "/* Generate property storage */" << std::endl;
 		for ( auto const& klassMapItem: ontology.classUri2Ptr()) {
 			const Klass& cls = *klassMapItem.second;
+			indent(ofs, 1) << "std::vector<uint64_t> " << cls.decorated().prettyIRIName() << "_INSTANCES;" << std::endl;
 			if ((cls.decorated().dataProperties().empty() && cls.decorated().objectProperties().empty())) {
 				indent(ofs, 1) << "// No property for " << cls.decorated().prettyIRIName() << std::endl;
 			} else {
@@ -260,54 +275,85 @@ void run(Factory *f) {
 
 		for ( auto const& klassMapItem: ontology.classUri2Ptr()) {
 			const Klass& cls = *klassMapItem.second;
+			indent(ofs, 1) << "for(auto const& obj: " << cls.genCppNameWithNamespace(false) << "::find()) {" << std::endl;
+			for (auto const& ancestor: cls.decorated().getAllAncestors()) {
+				Klass ancestorCls(*ancestor.get());
+				for ( const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
+					DataProperty(*prop.get()).generateSaverValuesSet(ofs, ancestorCls);
+				}
+				for ( const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
+					ObjectProperty(*prop.get()).generateSaverValuesSet(ofs, ancestorCls);
+				}
+			}
 			if ((cls.decorated().dataProperties().empty() && cls.decorated().objectProperties().empty())) {
 				indent(ofs, 1) << "// No property for " << cls.decorated().prettyIRIName() << std::endl;
 			} else {
-				indent(ofs, 1) << "// Storage for " << cls.decorated().prettyIRIName() << std::endl;
-				for ( const std::shared_ptr<ontology::DataProperty>& prop : cls.decorated().dataProperties()) {
-					DataProperty(*prop.get()).generateSaverValuesDecl(ofs, cls);
-				}
-				for ( const std::shared_ptr<ontology::ObjectProperty>& prop : cls.decorated().objectProperties()) {
-					ObjectProperty(*prop.get()).generateSaverValuesDecl(ofs, cls);
-				}
-				indent(ofs, 1) << "for(auto const& obj: " << cls.genCppNameWithNamespace(false) << "::find()) {" << std::endl;
 				for ( const std::shared_ptr<ontology::DataProperty>& prop : cls.decorated().dataProperties()) {
 					DataProperty(*prop.get()).generateSaverValuesSet(ofs, cls);
 				}
 				for ( const std::shared_ptr<ontology::ObjectProperty>& prop : cls.decorated().objectProperties()) {
 					ObjectProperty(*prop.get()).generateSaverValuesSet(ofs, cls);
 				}
-				indent(ofs, 1) << "}" << std::endl;
 			}
+			indent(ofs, 1) << "}" << std::endl;
 		}
-		
-		// indent(ofs, 1) << "// Generate instances" << std::endl;
-		// indent(ofs, 1) << "std::map<autordf::Object, uint64_t> allObjectIdentities;" << std::endl;
-		// indent(ofs, 1) << "std::map<autordf::Object, autordf::Uri> allObjectUris;" << std::endl;
-		// indent(ofs, 1) << "for (const auto& obj: autordf::Object::findAll()) {" << std::endl;
-		// for (auto const& root: rootKlasses) {
-		// 	indent(ofs, 2) << "if (obj.isA(Uri(\"" << root << "\"))) {" << std::endl;
-		// 	bool first = true;
-		// 	for (auto it = klassSortedDescendants[klassIndices[root]].rbegin(); it != klassSortedDescendants[klassIndices[root]].rend(); it++) {
-		// 		indent(ofs, 3);
-		// 		if (first) {
-		// 			first = false;
-		// 		} else {
-		// 			ofs << "} else ";
-		// 		}
-		// 		ofs << "if (obj.isA(Uri(\"" << indexKlasses[*it] << "\"))) {" << std::endl;
-		// 		indent(ofs, 4) << "// TODO: add to instances" << std::endl;
-		// 	}
-		// 	indent(ofs, 3) << "} else {" << std::endl;
-		// 	indent(ofs, 4) << "// TODO: add to root instances" << std::endl;
-		// 	indent(ofs, 3) << "}" << std::endl;
-		// 	indent(ofs, 2) << "}" << std::endl;
-		// }
-		// indent(ofs, 1) << "}" << std::endl;
+
+		indent(ofs, 1) << "// Generate instances" << std::endl;
+		indent(ofs, 1) << "std::map<autordf::Object, uint64_t> allObjectKlassIds;" << std::endl;
+		indent(ofs, 1) << "std::map<autordf::Object, uint64_t> allObjectIdentities;" << std::endl;
+		indent(ofs, 1) << "std::map<autordf::Uri, std::pair<uint64_t, uint64_t>> uriToObjects;" << std::endl;
+		indent(ofs, 1) << "// Generate instance klassId and identities" << std::endl;
+		for ( auto const& klassMapItem: ontology.classUri2Ptr()) {
+			const Klass& cls(*klassMapItem.second);
+			cls.generateSaverInitKlassIdsIdentities(ofs, klassIndices[cls.decorated().rdfname()]);
+		}
+		indent(ofs, 1) << "// Fill INSTANCES" << std::endl;
+		for ( auto const& klassMapItem: ontology.classUri2Ptr()) {
+			const Klass& cls(*klassMapItem.second);
+			cls.generateSaverInstanceSave(ofs, klassIndices[cls.decorated().rdfname()]);
+		}
+
+		indent(ofs, 1) << "// SERIALIZE" << std::endl;
+		indent(ofs, 1) << "std::ofstream ofs;" << std::endl;
+		indent(ofs, 1) << "createFile(outdir + \"Loader.cpp\", &ofs);" << std::endl;
+		indent(ofs, 1) << "ofs << \"#include \\\"All.h\\\"\" << std::endl;" << std::endl;
+		indent(ofs, 1) << "ofs << std::endl;" << std::endl;
+
+		for ( const std::string& cppNameSpace : cppNameSpaces ) {
+			indent(ofs, 1) << "ofs << \"#include \\\"" << cppNameSpace << "/" << cppNameSpace << ".h\\\"\" << std::endl;" << std::endl;
+		}
+
+		for ( auto const& klassMapItem: ontology.classUri2Ptr()) {
+			const Klass& cls(*klassMapItem.second);
+			cls.generateSaverGenLoaderData(ofs, klassIndices[cls.decorated().rdfname()]);
+		}
+
+		indent(ofs, 1) << "ofs << \"void Loader::loadAll() {\" << std::endl;" << std::endl;
+
+		for ( auto const& klassMapItem: ontology.classUri2Ptr()) {
+			const Klass& cls(*klassMapItem.second);
+			cls.generateSaverGenLoaderLoad(ofs, klassIndices[cls.decorated().rdfname()]);
+		}
+
+		indent(ofs, 1) << "// Fill URI_TO_OBJECT" << std::endl;
+
+		indent(ofs, 1) << "for (auto const& en: uriToObjects) {" << std::endl;
+		indent(ofs, 2) << "ofs << \"All::URI_TO_OBJECT[\\\"\" << en.first << \"\\\"] = std::make_pair(\" << en.second.first << \", \" << en.second.second << \");\" << std::endl;" << std::endl;
+		indent(ofs, 1) << "}" << std::endl;
+
+
+		indent(ofs, 1) << "ofs << \"}\" << std::endl;" << std::endl;
 
 		ofs << "}" << std::endl;
 
 		ofs << std::endl;
+
+		// ofs << "int main(int argc, char* argv[]) {" << std::endl;
+		// indent(ofs, 1) << "autordf::Factory f;" << std::endl;
+		// indent(ofs, 1) << "autordf::Object::setFactory(&f);" << std::endl;
+		// indent(ofs, 1) << "f.loadFromFile(argv[1]);" << std::endl;
+		// indent(ofs, 1) << "Saver::saveAll(argv[2]);" << std::endl;
+		// ofs << "}" << std::endl;
     }
 
 

@@ -49,6 +49,52 @@ TARGET_LINK_LIBRARIES(
     boost_filesystem
 )
 
+ADD_EXECUTABLE(
+    testsaver
+    SaveAll.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IAgent.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IDocument.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IGroup.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IImage.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/ILabelProperty.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IOnlineAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IOnlineChatAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IOnlineEcommerceAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IOnlineGamingAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IOrganization.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IPerson.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IPersonalProfileDocument.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IProject.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/rdfs/IResource.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/rdfs/IClass.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/owl/IThing.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/Agent.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/Document.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/Group.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/Image.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/LabelProperty.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/OnlineAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/OnlineChatAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/OnlineEcommerceAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/OnlineGamingAccount.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/Organization.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/Person.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/PersonalProfileDocument.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/Project.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/rdfs/Resource.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/rdfs/Class.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/owl/Thing.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/All.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/foaftest/Saver.cpp"
+)
+
+TARGET_LINK_LIBRARIES(
+    testsaver
+    autordf
+    boost_system
+    boost_filesystem
+)
+
 ADD_CUSTOM_COMMAND(
     OUTPUT
         "${CMAKE_CURRENT_BINARY_DIR}/foaftest/foaf/IAgent.cpp"

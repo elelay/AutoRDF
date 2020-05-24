@@ -15,7 +15,7 @@ Klass Klass::uri2Klass(const std::string& uri) const {
     return Klass(*_decorated.ontology()->findClass(uri));
 }
 
-void Klass::generateDeclaration(uint64_t iKlass, const std::set<uint64_t>& descendants) const {
+void Klass::generateDeclaration(uint64_t iKlass) const {
     std::string cppName = _decorated.prettyIRIName();
     std::ofstream ofs;
     createFile(genCppNameSpaceInclusionPath() + "/" + cppName + ".h", &ofs);
@@ -169,11 +169,7 @@ void Klass::generateDeclaration(uint64_t iKlass, const std::set<uint64_t>& desce
     indent(ofs, 1) << "return " << genCppNameSpaceFullyQualified() << "::" << cppName << "(_klass, _identity);" << std::endl;
     ofs << "}" << std::endl;
     ofs << "template<> inline bool autordf::Object::isA<" << genCppNameSpaceFullyQualified() << "::" << cppName   << ">() const {" << std::endl;
-    indent(ofs, 1) << "return (_klass == " << iKlass << ")";
-    for (uint64_t d: descendants) {
-    	ofs << " || (_klass == " << d << ")";
-    }
-    ofs << ";" << std::endl;
+    indent(ofs, 1) << "return _klass == " << iKlass << ";" << std::endl;
     ofs << "}" << std::endl;
     ofs << "}" << std::endl;
 
@@ -514,6 +510,92 @@ size_t Klass::storageSize() const {
     }
 	return i;
 }
+
+void Klass::generateSaverInitKlassIdsIdentities(std::ofstream& ofs, uint64_t iKlass) const {
+	indent(ofs, 1) << "{" << std::endl;
+	indent(ofs, 2) << "uint64_t identity = 1;" << std::endl;
+	indent(ofs, 2) << "for(auto const& obj: " << genCppNameWithNamespace(false) << "::find()) {" << std::endl;
+	indent(ofs, 3) << "allObjectKlassIds[obj] = " << iKlass << ";" << std::endl;
+	indent(ofs, 3) << "allObjectIdentities[obj] = identity;" << std::endl;
+	indent(ofs, 3) << "if (!obj.iri().empty()) {" << std::endl;
+	indent(ofs, 4) << "uriToObjects[obj.iri()] = std::make_pair(" << iKlass << ", identity);"  << std::endl;
+	indent(ofs, 3) << "}" << std::endl;
+	indent(ofs, 3) << "identity += " << storageSize() << ";" << std::endl;
+	indent(ofs, 2) << "}" << std::endl;
+	indent(ofs, 1) << "}" << std::endl;
+}
+
+void Klass::generateSaverInstanceSave(std::ofstream& ofs, uint64_t iKlass) const {
+	indent(ofs, 1) << "{ // " << _decorated.prettyIRIName() << std::endl;
+	indent(ofs, 1) << "uint64_t identity = 1;" << std::endl;
+	indent(ofs, 1) << "for(auto const& obj: " << genCppNameWithNamespace(false) << "::find()) {" << std::endl;
+	int propOffset = 0;
+	for (auto const& ancestor: decorated().getAllAncestors()) {
+		Klass ancestorCls(*ancestor.get());
+		for (const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
+			propOffset = DataProperty(*prop.get()).generateSaverInstanceSave(ofs, *this, ancestorCls, propOffset);
+		}
+		for (const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
+			propOffset = ObjectProperty(*prop.get()).generateSaverInstanceSave(ofs, *this, ancestorCls, propOffset);
+		}
+	}
+	for (const std::shared_ptr<ontology::DataProperty>& prop : decorated().dataProperties()) {
+		propOffset = DataProperty(*prop.get()).generateSaverInstanceSave(ofs, *this, *this, propOffset);
+	}
+	for (const std::shared_ptr<ontology::ObjectProperty>& prop : decorated().objectProperties()) {
+		propOffset = ObjectProperty(*prop.get()).generateSaverInstanceSave(ofs, *this, *this, propOffset);
+	}
+	indent(ofs, 2) << "identity += " << storageSize() << ";" << std::endl;
+	indent(ofs, 1) << "}" << std::endl;
+	indent(ofs, 1) << "} // end " << _decorated.prettyIRIName() << std::endl;
+}
+
+void Klass::generateSaverGenLoaderData(std::ostream& ofs, uint64_t iKlass) const {
+	for (auto const& ancestor: decorated().getAllAncestors()) {
+		Klass ancestorCls(*ancestor.get());
+		for (const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
+			DataProperty(*prop.get()).generateSaverGenLoaderData(ofs, ancestorCls);
+		}
+		for (const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
+			ObjectProperty(*prop.get()).generateSaverGenLoaderData(ofs, ancestorCls);
+		}
+	}
+	for (const std::shared_ptr<ontology::DataProperty>& prop : decorated().dataProperties()) {
+		DataProperty(*prop.get()).generateSaverGenLoaderData(ofs, *this);
+	}
+	for (const std::shared_ptr<ontology::ObjectProperty>& prop : decorated().objectProperties()) {
+		ObjectProperty(*prop.get()).generateSaverGenLoaderData(ofs, *this);
+	}
+
+	indent(ofs, 1) << "ofs << \"static uint64_t " << _decorated.prettyIRIName() << "_INSTANCES[] = {\" << std::endl;" << std::endl;
+	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+	indent(ofs, 1) << "for (auto i: " << _decorated.prettyIRIName() << "_INSTANCES) {" << std::endl;
+		indent(ofs, 2) << "ofs << \", \" << i;" << std::endl;
+	indent(ofs, 1) << "}" << std::endl;
+	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+}
+
+void Klass::generateSaverGenLoaderLoad(std::ostream& ofs, uint64_t iKlass) const {
+	for (auto const& ancestor: decorated().getAllAncestors()) {
+		Klass ancestorCls(*ancestor.get());
+		for (const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
+			DataProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, ancestorCls);
+		}
+		for (const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
+			ObjectProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, ancestorCls);
+		}
+	}
+	for (const std::shared_ptr<ontology::DataProperty>& prop : decorated().dataProperties()) {
+		DataProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, *this);
+	}
+	for (const std::shared_ptr<ontology::ObjectProperty>& prop : decorated().objectProperties()) {
+		ObjectProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, *this);
+	}
+	indent(ofs, 1) << "ofs << \"" << genCppNameWithNamespace(false) << "::initInstances("
+		<< _decorated.prettyIRIName() << "_INSTANCES, \" << " << _decorated.prettyIRIName() << "_INSTANCES.size()"
+		<< " << \");\" << std::endl;" << std::endl;
+}
+
 
 }
 }

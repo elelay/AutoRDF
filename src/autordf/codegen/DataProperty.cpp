@@ -69,17 +69,22 @@ void DataProperty::generateDeclaration(std::ostream& ofs, const Klass& onClass) 
 
 uint64_t DataProperty::storageSize(const Klass& onClass) const {
     std::pair<cvt::RdfTypeEnum, std::string> rdfCppType = getRdfCppTypes(onClass);
-    return rdfCppType.second.empty() ? 3 : 1;
+    bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
+    return forMany ? 2 : (rdfCppType.second.empty() ? 3 : 1);
 }
 
 void DataProperty::generateStorage(std::ostream& ofs, const Klass& onClass, bool optional, bool forMany) const {
     std::pair<cvt::RdfTypeEnum, std::string> rdfCppType = getRdfCppTypes(onClass);
 
     if (!rdfCppType.second.empty()) {
-    	indent(ofs, 1) << "static void initS_" << _decorated.prettyIRIName() << "(" << rdfCppType.second << "* storage, size_t len);\n" << std::endl;
+    	indent(ofs, 1) << "static void initS_" << _decorated.prettyIRIName() << "(" << rdfCppType.second << "* storage";
 	} else {
-    	indent(ofs, 1) << "static void initS_" << _decorated.prettyIRIName() << "(std::string* valueStorage, std::string* langStorage, std::string* typeStorage, size_t len);\n" << std::endl;
+    	indent(ofs, 1) << "static void initS_" << _decorated.prettyIRIName() << "(std::string* valueStorage, std::string* langStorage, std::string* typeStorage" << std::endl;
 	}
+	if (forMany) {
+		ofs << ", uint64_t* arrStorage";
+	}
+	ofs << ", size_t len);\n" << std::endl;
 
 	ofs << "protected:" << std::endl;
     if (!rdfCppType.second.empty()) {
@@ -92,6 +97,7 @@ void DataProperty::generateStorage(std::ostream& ofs, const Klass& onClass, bool
 	indent(ofs, 1) << "static size_t SL_" << _decorated.prettyIRIName() << ";" << std::endl;
 	indent(ofs, 1) << "uint64_t i_" << _decorated.prettyIRIName() << ";" << std::endl;
 	if (forMany) {
+    	indent(ofs, 1) << "static uint64_t* SARR_" << _decorated.prettyIRIName() << ";" << std::endl;
 		indent(ofs, 1) << "uint64_t c_" << _decorated.prettyIRIName() << ";" << std::endl;
 	}
 	ofs << std::endl;
@@ -160,9 +166,15 @@ void DataProperty::generateKeyDeclaration(std::ostream& ofs, const Klass& onClas
 void DataProperty::generateDefinition(std::ostream& ofs, const Klass& onClass) const {
     std::string currentClassName = "I" + onClass.decorated().prettyIRIName();
     std::pair<cvt::RdfTypeEnum, std::string> rdfCppType = getRdfCppTypes(onClass);
+    bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
+
 
     ofs << "const autordf::Uri " << currentClassName << "::" << _decorated.prettyIRIName() << "DataPropertyIri = \"" << _decorated.rdfname() << "\";" << std::endl;
     ofs << std::endl;
+
+	if (forMany) {
+    	ofs << "uint64_t* " << currentClassName << "::SARR_" << _decorated.prettyIRIName() << " = 0;" << std::endl;
+	}
 
     if (rdfCppType.second.empty()) {
     	ofs << "std::string* " << currentClassName << "::SV_" << _decorated.prettyIRIName() << " = nullptr;" << std::endl;
@@ -170,10 +182,18 @@ void DataProperty::generateDefinition(std::ostream& ofs, const Klass& onClass) c
     	ofs << "std::string* " << currentClassName << "::STYPE_" << _decorated.prettyIRIName() << " = nullptr;" << std::endl;
     	ofs << "uint64_t " << currentClassName << "::SL_" << _decorated.prettyIRIName() << " = 0;" << std::endl;
 
-    	ofs << "void " << currentClassName << "::initS_" << _decorated.prettyIRIName() << "(std::string* valueStorage, std::string* langStorage, std::string* typeStorage, size_t len) {" << std::endl;
+    	ofs << "void " << currentClassName << "::initS_" << _decorated.prettyIRIName() << "(std::string* valueStorage, std::string* langStorage, std::string* typeStorage";
+    	if (forMany) {
+    		ofs << ", uint64_t* arrStorage";
+    	}
+    	ofs << ", size_t len) {" << std::endl;
+
     	indent(ofs, 1) << "SV_" << _decorated.prettyIRIName() << " = valueStorage;" << std::endl;
     	indent(ofs, 1) << "SLANG_" << _decorated.prettyIRIName() << " = langStorage;" << std::endl;
     	indent(ofs, 1) << "STYPE_" << _decorated.prettyIRIName() << " = typeStorage;" << std::endl;
+    	if (forMany) {
+    		indent(ofs, 1) << "SARR_" << _decorated.prettyIRIName() << " = arrStorage;" << std::endl;
+    	}
     	indent(ofs, 1) << "SL_" << _decorated.prettyIRIName() << " = len;" << std::endl;
     	ofs << "}" << std::endl;
     	ofs << std::endl;
@@ -209,7 +229,7 @@ void DataProperty::generateDefinition(std::ostream& ofs, const Klass& onClass) c
                 ofs << "}" << std::endl;
             }
         }
-        if (_decorated.maxCardinality(onClass.decorated()) > 1) {
+        if (forMany) {
             ofs << "autordf::PropertyValueVector " << currentClassName << "::" << _decorated.prettyIRIName() <<
             "List() const {" << std::endl;
             // indent(ofs, 1) << "return object().getValueListImpl<autordf::cvt::RdfTypeEnum::" <<
@@ -217,10 +237,11 @@ void DataProperty::generateDefinition(std::ostream& ofs, const Klass& onClass) c
             indent(ofs, 1) << "autordf::PropertyValueVector ret;" << std::endl;
             indent(ofs, 1) << "ret.reserve(" << "c_" << _decorated.prettyIRIName() << ");" << std::endl;
 			indent(ofs, 1) << "for (uint64_t i=0; i < c_" << _decorated.prettyIRIName() << "; i++) {" << std::endl;
+			indent(ofs, 2) << "uint64_t j = SARR_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << " + i];" << std::endl;
 			indent(ofs, 2) << "ret.emplace_back("
-            	<< "SV_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << " + i]"
-            	<< ", SLANG_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << " + i]"
-            	<< ", STYPE_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << " + i]"
+            	<< "SV_" << _decorated.prettyIRIName() << "[j]"
+            	<< ", SLANG_" << _decorated.prettyIRIName() << "[j]"
+            	<< ", STYPE_" << _decorated.prettyIRIName() << "[j]"
             	<< ");" << std::endl;
 			indent(ofs, 1) << "}" << std::endl;
 			indent(ofs, 1) << "return ret;" << std::endl;
@@ -234,8 +255,17 @@ void DataProperty::generateDefinition(std::ostream& ofs, const Klass& onClass) c
     	ofs << rdfCppType.second << "* " << currentClassName << "::S_" << _decorated.prettyIRIName() << " = nullptr;" << std::endl;
     	ofs << "uint64_t " << currentClassName << "::SL_" << _decorated.prettyIRIName() << " = 0;" << std::endl;
 
-    	ofs << "void " << currentClassName << "::initS_" << _decorated.prettyIRIName() << "(" << rdfCppType.second << "* storage, size_t len) {" << std::endl;
+    	ofs << "void " << currentClassName << "::initS_" << _decorated.prettyIRIName() << "(" << rdfCppType.second << "* storage";
+    	if (forMany) {
+    		ofs << ", uint64_t* arrStorage";
+    	}
+    	ofs << ", size_t len) {" << std::endl;
+
+
     	indent(ofs, 1) << "S_" << _decorated.prettyIRIName() << " = storage;" << std::endl;
+    	if (forMany) {
+    		indent(ofs, 1) << "SARR_" << _decorated.prettyIRIName() << " = arrStorage;" << std::endl;
+    	}
     	indent(ofs, 1) << "SL_" << _decorated.prettyIRIName() << " = len;" << std::endl;
     	ofs << "}" << std::endl;
     	ofs << std::endl;
@@ -272,12 +302,15 @@ void DataProperty::generateDefinition(std::ostream& ofs, const Klass& onClass) c
             "List() const {" << std::endl;
             // indent(ofs, 1) << "return object().getValueListImpl<autordf::cvt::RdfTypeEnum::" <<
             // cvt::rdfTypeEnumString(rdfType) << ", " << cppType << ">(\"" << _decorated.rdfname() << "\", " << orderedBoolValue() << ");" << std::endl;
-            indent(ofs, 1) << "return std::vector<" << cppType
-            	<< ">(S_" << _decorated.prettyIRIName() << " + i_" << _decorated.prettyIRIName()
-            	<< ", S_" << _decorated.prettyIRIName() << " + i_" << _decorated.prettyIRIName() << " + " << "c_" << _decorated.prettyIRIName()
-            	<< ");" << std::endl;
-            ofs << "}" << std::endl;
-            ofs << std::endl;
+
+            indent(ofs, 1) << "std::vector<" << cppType << "> ret;" << std::endl;
+            indent(ofs, 1) << "ret.reserve(" << "c_" << _decorated.prettyIRIName() << ");" << std::endl;
+			indent(ofs, 1) << "for (uint64_t i=0; i < c_" << _decorated.prettyIRIName() << "; i++) {" << std::endl;
+			indent(ofs, 2) << "uint64_t j = SARR_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << " + i];" << std::endl;
+			indent(ofs, 2) << "ret.emplace_back(S_" << _decorated.prettyIRIName() << "[j]);" << std::endl;
+			indent(ofs, 1) << "}" << std::endl;
+			indent(ofs, 1) << "return ret;" << std::endl;
+			ofs << "}" << std::endl;
             // ofs << currentClassName << "& " << currentClassName << "::set" << _decorated.prettyIRIName(true) << "(const std::vector<" << cppType << ">& values) {" << std::endl;
             // indent(ofs, 1) <<     "object().setValueListImpl<autordf::cvt::RdfTypeEnum::" <<
             // cvt::rdfTypeEnumString(rdfType) << ">(\"" << _decorated.rdfname() << "\", values, " << orderedBoolValue() << ");" << std::endl;
@@ -484,6 +517,9 @@ void DataProperty::generateSaverValuesDecl(std::ostream& ofs, const Klass& onCla
         std::string cppType = rdfCppType.second;
         indent(ofs, 1) << "std::set<" << cppType << "> " << currentClassName << "_" << name() << "_values;" << std::endl;
     }
+    if (_decorated.maxCardinality(onClass.decorated()) > 1) {
+        indent(ofs, 1) << "std::vector<uint64_t> " << currentClassName << "_" << name() << "_ARR;" << std::endl;
+    }
 }
 
 void DataProperty::generateSaverValuesSet(std::ostream& ofs, const Klass& onClass) const {
@@ -508,6 +544,123 @@ void DataProperty::generateSaverValuesSet(std::ostream& ofs, const Klass& onClas
 		indent(ofs, 3) << currentClassName << "_" << name() << "_values.insert(p);" << std::endl;
 		indent(ofs, 2) << "}" << std::endl;
 	}
+}
+
+int DataProperty::generateSaverInstanceSave(std::ostream& ofs, const Klass& onClass, const Klass& storageClass, int propOffset) const {
+    std::pair<cvt::RdfTypeEnum, std::string> rdfCppType = getRdfCppTypes(onClass);
+    std::string storageClassName = storageClass.decorated().prettyIRIName();
+    std::string currentClassName = onClass.decorated().prettyIRIName();
+    std::string propType = rdfCppType.second.empty() ? "autordf::PropertyValue" : rdfCppType.second;
+
+	indent(ofs, 2) << "{ // " << currentClassName << " " << storageClassName << "::" << _decorated.prettyIRIName() << std::endl;
+	if (_decorated.maxCardinality(onClass.decorated()) <= 1) {
+		if (_decorated.minCardinality(onClass.decorated()) > 0) {
+			indent(ofs, 3) << "uint64_t i=1;" << std::endl;
+			indent(ofs, 3) << "auto const& objV = obj." << _decorated.prettyIRIName() << "());" << std::endl;
+			indent(ofs, 3) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+			indent(ofs, 4) << "if (objV == v) {" << std::endl;
+			indent(ofs, 5) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = i;" << std::endl;
+			indent(ofs, 5) << "break;" << std::endl;
+			indent(ofs, 4) << "}" << std::endl;
+			indent(ofs, 4) << "i++;" << std::endl;
+			indent(ofs, 3) << "}" << std::endl;
+		} else {
+			indent(ofs, 3) << "std::shared_ptr<" << propType << "> tmp = obj." << _decorated.prettyIRIName() << "Optional();" << std::endl;
+			indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = 0;" << std::endl;
+			indent(ofs, 3) << "if (tmp) {" << std::endl;
+			indent(ofs, 4) << "uint64_t i=1;" << std::endl;
+			indent(ofs, 4) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+			indent(ofs, 5) << "if (*tmp == v) {" << std::endl;
+			indent(ofs, 6) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = i;" << std::endl;
+			indent(ofs, 6) << "break;" << std::endl;
+			indent(ofs, 5) << "}" << std::endl;
+			indent(ofs, 5) << "i++;" << std::endl;
+			indent(ofs, 4) << "}" << std::endl;
+			indent(ofs, 3) << "}" << std::endl;
+		}
+	} else {  // maxCardinality > 1
+		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = " << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.size();" << std::endl;
+		indent(ofs, 3) << "uint64_t j=0;" << std::endl;
+		indent(ofs, 3) << "for(auto const& p: obj." << _decorated.prettyIRIName() << "List()) {" << std::endl;
+			indent(ofs, 4) << "uint64_t i=1;" << std::endl;
+			indent(ofs, 4) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+				indent(ofs, 5) << "if (p == v) {" << std::endl;
+					indent(ofs, 6) << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.push_back(i);" << std::endl;
+					indent(ofs, 6) << "break;" << std::endl;
+				indent(ofs, 5) << "}" << std::endl;
+				indent(ofs, 5) << "i++;" << std::endl;
+			indent(ofs, 4) << "}" << std::endl;
+			indent(ofs, 4) << "j++;" << std::endl;
+		indent(ofs, 3) << "}" << std::endl;
+		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1)  << "] = j;" << std::endl;
+	}
+	indent(ofs, 2) << "}" << std::endl;
+	return propOffset + storageSize(onClass);
+}
+
+void DataProperty::generateSaverGenLoaderData(std::ostream& ofs, const Klass& onClass) const {
+    std::pair<cvt::RdfTypeEnum, std::string> rdfCppType = getRdfCppTypes(onClass);
+    std::string storageClassName = onClass.decorated().prettyIRIName();
+    std::string propType = rdfCppType.second.empty() ? "autordf::PropertyValue" : rdfCppType.second;
+    bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
+
+	indent(ofs, 1) << "ofs << \"static const size_t " << storageClassName << "_SL_" << _decorated.prettyIRIName() << " = " << storageClassName << "_" << name() << "_values.size();\\n\";" << std::endl;
+    if (!rdfCppType.second.empty()) {
+    	indent(ofs, 1) << "ofs << \"static " << rdfCppType.second << " " << storageClassName << "_S_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+    	indent(ofs, 2) << "ofs << \", \" << v << std::endl;" << std::endl;
+    	indent(ofs, 1) << "}" << std::endl;
+    	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+	} else {
+    	indent(ofs, 1) << "ofs << \"static std::string " << storageClassName << "_SV_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+    	indent(ofs, 2) << "ofs << \", \" << v << std::endl;" << std::endl;
+    	indent(ofs, 1) << "}" << std::endl;
+    	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+
+    	indent(ofs, 1) << "ofs << \"static std::string " << storageClassName << "_SLANG_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+    	indent(ofs, 2) << "ofs << \", \" << v.lang() << std::endl;" << std::endl;
+    	indent(ofs, 1) << "}" << std::endl;
+    	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+
+    	indent(ofs, 1) << "ofs << \"static std::string " << storageClassName << "_STYPE_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+    	indent(ofs, 2) << "ofs << \", \" << v.dataTypeIri() << std::endl;" << std::endl;
+    	indent(ofs, 1) << "}" << std::endl;
+    	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+	}
+	if (forMany) {
+    	indent(ofs, 1) << "ofs << \"static uint64_t " << storageClassName << "_SARR_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
+    	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_ARR) {" << std::endl;
+    	indent(ofs, 2) << "ofs << \", \" << v << std::endl;" << std::endl;
+    	indent(ofs, 1) << "}" << std::endl;
+    	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
+	}
+}
+
+void DataProperty::generateSaverGenLoaderLoad(std::ostream& ofs, const Klass& onClass) const {
+    std::pair<cvt::RdfTypeEnum, std::string> rdfCppType = getRdfCppTypes(onClass);
+    std::string storageClassName = onClass.decorated().prettyIRIName();
+    std::string propType = rdfCppType.second.empty() ? "autordf::PropertyValue" : rdfCppType.second;
+    bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
+	indent(ofs, 1) << "ofs << \"" << storageClassName << "::initS_" << _decorated.prettyIRIName() << "(";
+	if (rdfCppType.second.empty()) {
+		ofs << storageClassName << "_SV_" << _decorated.prettyIRIName()
+			<< ", " << storageClassName << "_SLANG_" << _decorated.prettyIRIName()
+			<< ", " << storageClassName << "_STYPE_" << _decorated.prettyIRIName();
+	} else {
+		ofs << storageClassName << "_S_" << _decorated.prettyIRIName();
+	}
+	if (forMany) {
+		 ofs << ", " << storageClassName << "_SARR_" << _decorated.prettyIRIName();
+	}
+	ofs << ", " << storageClassName << "_SL_" << _decorated.prettyIRIName() << ");\\n\";" << std::endl;
 }
 
 std::string DataProperty::orderedBoolValue() const {

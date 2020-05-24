@@ -33,12 +33,19 @@ public:
     }
 
     uint64_t storageSize(const Klass&) const {
+    	// either (klassId, identity) or (index, count)
     	return 2;
     }
 
     void generateSaverValuesDecl(std::ostream& ofs, const Klass& onClass) const;
 
     void generateSaverValuesSet(std::ostream& ofs, const Klass& onClass) const;
+
+    int generateSaverInstanceSave(std::ostream& ofs, const Klass& onClass, const Klass& storageClass, int propOffset) const;
+
+	void generateSaverGenLoaderData(std::ostream& ofs, const Klass& onClass) const;
+
+	void generateSaverGenLoaderLoad(std::ostream& ofs, const Klass& onClass) const;
 
 private:
     /**
