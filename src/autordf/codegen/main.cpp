@@ -24,19 +24,6 @@ namespace codegen {
 bool verbose = false;
 bool generateAllInOne = false;
 
-// class KlassNode {
-// public:
-// 	KlassNode(autordf::Uri k): klass(k) {}
-
-// public:
-// 	autordf::Uri k;
-// 	std::list<KlassNode> descendants;
-// }
-
-// void makeKlassTree(KlassNode& n, const std::map<uint64_t, std::set<uint64_t>>& klassDescendants, const std::map<uint64_t, autordf::Uri>& indexKlasses) {
-
-// }
-
 void run(Factory *f) {
     ontology::Ontology ontology(f, verbose);
 
@@ -64,37 +51,6 @@ void run(Factory *f) {
 			rootKlasses.push_back((*klassMapItem.second).rdfname());
 		}
 	}
-	// std::map<uint64_t, std::vector<uint64_t>> klassSortedDescendants;
-	// for (auto const& k: klassDescendants) {
-	// 	std::vector<uint64_t> desc(k.second.begin(), k.second.end());
-	// 	std::sort(desc.begin(), desc.end(), [&klassDescendants](uint64_t a, uint64_t b) {
-	// 		if (klassDescendants.find(b) == klassDescendants.end()) {
-	// 			return true;
-	// 		} else {
-	// 			auto bdesc = klassDescendants[b];
-	// 			if (bdesc.find(a) == bdesc.end()) {
-	// 				return false;
-	// 			}
-	// 		}
-	// 		if (klassDescendants.find(a) == klassDescendants.end()) {
-	// 			return false;
-	// 		} else {
-	// 			auto adesc = klassDescendants[a];
-	// 			if (adesc.find(b) == adesc.end()) {
-	// 				return false;
-	// 			}
-	// 	    }
-	// 		return false;
-	// 	});
-	// 	klassSortedDescendants[k.first] = desc;
-	// }
-	// for (auto const& kd: klassSortedDescendants) {
-	// 	std::cout << indexKlasses[kd.first];
-	// 	for (auto const& d: kd.second) {
-	// 		std::cout << " -> " << indexKlasses[d];
-	// 	}
-	// 	std::cout << std::endl;
-	// }
 
     for ( auto const& klassMapItem: ontology.classUri2Ptr()) {
         iKlass = klassIndices[(*klassMapItem.second).rdfname()];
@@ -147,8 +103,6 @@ void run(Factory *f) {
 		std::ofstream ofs;
 		createFile(RdfsEntity::outdir + "/All.h", &ofs);
 
-		// ofs << "#include <map>" << std::endl;
-		// ofs << std::endl;
         generateCodeProtectorBegin(ofs, "ALL", "ALL");
         ofs << std::endl;
         ofs << "#include <cstdint>" << std::endl;
@@ -373,6 +327,7 @@ int main(int argc, char **argv) {
     desc.add_options()
             ("help,h", "Describe arguments")
             ("verbose,v", "Turn verbose output on.")
+            ("staticmodel,s", "Generate static model.")
             ("all-in-one,a", "Generate one cpp file that includes all the other called AllInOne.cpp")
             ("namespacemap,n", po::value< std::vector<std::string> >(), "Adds supplementary namespaces prefix definition, in the form 'prefix:namespace IRI'. Defaults to empty.")
             ("outdir,o", po::value< std::string >(), "Folder where to generate files in. If it does not exit it will be created. Defaults to current directory.")
@@ -389,6 +344,10 @@ int main(int argc, char **argv) {
     if (vm.count("help")) {
         std::cout << desc << "\n";
         return 1;
+    }
+    
+    if (vm.count("staticmodel")) {
+    	autordf::codegen::genStaticModel = true;
     }
 
     autordf::codegen::verbose = vm.count("verbose") > 0;

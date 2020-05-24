@@ -119,6 +119,9 @@ void generateCodeProtectorEnd(std::ofstream& ofs, const std::string& cppNameSpac
     ofs << "#endif // " <<  protector << std::endl;
 }
 
+bool genStaticModel = false;
+
 }
+
 }
 

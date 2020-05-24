@@ -22,6 +22,8 @@ void generateCodeProtectorEnd(std::ofstream& ofs, const std::string& cppNameSpac
 void createDirectory(const std::string& relativeDirName);
 
 void createFile(const std::string& fileName, std::ofstream *ofs);
+
+extern bool genStaticModel;
 }
 }
 
