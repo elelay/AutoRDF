@@ -18,7 +18,9 @@ void ObjectProperty::generateDeclaration(std::ostream& ofs, const Klass& onClass
     ofs << std::endl;
 
     if ( _decorated.maxCardinality(onClass.decorated()) <= 1 ) {
+        if(genStaticModel()) {
     	generateStorage(ofs, onClass, false);
+        }
         if ( _decorated.minCardinality(onClass.decorated()) > 0 ) {
             std::string methodName = _decorated.prettyIRIName();
             generatePropertyComment(ofs, onClass, methodName,  1,
@@ -33,22 +35,28 @@ void ObjectProperty::generateDeclaration(std::ostream& ofs, const Klass& onClass
         }
     }
     if ( _decorated.maxCardinality(onClass.decorated()) > 1 ) {
+        if(genStaticModel()) {
     	generateStorage(ofs, onClass, true);
+        }
 
         std::string methodName = _decorated.prettyIRIName() + "List";
         generatePropertyComment(ofs, onClass, methodName,  1,
                         "@return the list typed objects.  List can be empty if not values are set in database", &propertyClass);
         indent(ofs, 1) << "std::vector<" << propertyClass.genCppNameWithNamespace()  << "> " << methodName << "() const;" << std::endl;
         ofs << std::endl;
-        // generateDeclarationSetterForMany(ofs, onClass);
+        if (!genStaticModel()) {
+        generateDeclarationSetterForMany(ofs, onClass);
+        }
     }
     ofs << std::endl;
-    // generateDeclarationSetterForOne(ofs, onClass);
-    // if ( _decorated.minCardinality(onClass.decorated()) != _decorated.maxCardinality(onClass.decorated()) ) {
-    //     ofs << std::endl;
-    //     generateRemoverDeclaration(ofs, onClass);
-    // }
-    // ofs << std::endl;
+    if (!genStaticModel()) {
+    generateDeclarationSetterForOne(ofs, onClass);
+    if ( _decorated.minCardinality(onClass.decorated()) != _decorated.maxCardinality(onClass.decorated()) ) {
+        ofs << std::endl;
+        generateRemoverDeclaration(ofs, onClass);
+    }
+    }
+    ofs << std::endl;
 }
 
 void ObjectProperty::generateStorage(std::ostream& ofs, const Klass& onClass, bool forMany) const {
@@ -85,7 +93,9 @@ void ObjectProperty::generateKeyDeclaration(std::ostream& ofs, const Klass& onCl
     indent(ofs, 1) << " */" << std::endl;
 
     indent(ofs, 1) << "static " << currentClassName << " findBy" << _decorated.prettyIRIName(true) << "( const " << propertyClass.genCppNameWithNamespace() << "& key ) {" << std::endl;
-    // indent(ofs, 2) <<     "return Object::findByKey(\"" << _decorated.rdfname() << "\", reinterpret_cast<const ::autordf::Object&>(key)).as<" << currentClassName << ">();" << std::endl;
+    if (!genStaticModel()) {
+    indent(ofs, 2) <<     "return Object::findByKey(\"" << _decorated.rdfname() << "\", reinterpret_cast<const ::autordf::Object&>(key)).as<" << currentClassName << ">();" << std::endl;
+    } else {
 	indent(ofs, 2) << "uint64_t klassId = key.klass();" << std::endl;
 	indent(ofs, 2) << "uint64_t valueIndex = key.identity();" << std::endl;
 	indent(ofs, 2) << "if (valueIndex > 0) {" << std::endl;
@@ -102,6 +112,7 @@ void ObjectProperty::generateKeyDeclaration(std::ostream& ofs, const Klass& onCl
 	indent(ofs, 3) << "ss << \"No object with key " << _decorated.prettyIRIName() << "=\" << key << \" found\";" << std::endl;
 	indent(ofs, 3) << "throw autordf::ObjectNotFound(ss.str());" << std::endl;
 	indent(ofs, 2) << "}" << std::endl;
+    }
     indent(ofs, 1) << "}" << std::endl;
 	ofs << std::endl;
 }
@@ -113,7 +124,7 @@ void ObjectProperty::generateDefinition(std::ostream& ofs, const Klass& onClass)
 
     ofs << "const autordf::Uri " << currentClassName << "::" << _decorated.prettyIRIName() << "ObjectPropertyIri = \"" << _decorated.rdfname() << "\";" << std::endl;
     ofs << std::endl;
-
+    if (genStaticModel()) {
 	if (forMany) {
     	ofs << "uint64_t* " << currentClassName << "::SARR_" << _decorated.prettyIRIName() << " = 0;" << std::endl;
 	}
@@ -136,11 +147,14 @@ void ObjectProperty::generateDefinition(std::ostream& ofs, const Klass& onClass)
 	indent(ofs, 1) << "SL_" << _decorated.prettyIRIName() << " = len;" << std::endl;
 	ofs << "}" << std::endl;
 	ofs << std::endl;
+    }
 
     if ( _decorated.maxCardinality(onClass.decorated()) <= 1 ) {
         if ( _decorated.minCardinality(onClass.decorated()) > 0 ) {
             ofs << propertyClass.genCppNameWithNamespace() << " " << currentClassName << "::" << _decorated.prettyIRIName() << "() const {" << std::endl;
-            // indent(ofs, 1) << "return object().getObject(\"" << _decorated.rdfname() << "\").as<" << propertyClass.genCppNameWithNamespace() << ">();" << std::endl;
+            if (!genStaticModel()) {
+            indent(ofs, 1) << "return object().getObject(\"" << _decorated.rdfname() << "\").as<" << propertyClass.genCppNameWithNamespace() << ">();" << std::endl;
+            } else {
             indent(ofs, 1) << "if (i_" << _decorated.prettyIRIName() << " > 0) {" << std::endl;
             indent(ofs, 2) << "return " << propertyClass.genCppNameWithNamespace() << "("
             	<< "SK_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << "]"
@@ -148,12 +162,15 @@ void ObjectProperty::generateDefinition(std::ostream& ofs, const Klass& onClass)
             indent(ofs, 1) << "} else {" << std::endl;
             indent(ofs, 2) << "throw autordf::PropertyNotFound(\"Property " << _decorated.prettyIRIName() << " not found in TODO\");" << std::endl;
             indent(ofs, 1) << "}" << std::endl;
+            }
             ofs << "}" << std::endl;
         } else {
             ofs << "std::shared_ptr<" << propertyClass.genCppNameWithNamespace() << "> " << currentClassName << "::" <<
                     _decorated.prettyIRIName() << "Optional() const {" << std::endl;
-            // indent(ofs, 1) << "auto result = object().getOptionalObject(\"" << _decorated.rdfname() << "\");" << std::endl;
-            // indent(ofs, 1) << "return result ? std::make_shared<" << propertyClass.genCppNameWithNamespace() << ">(*result) : nullptr;" << std::endl;
+            if (!genStaticModel()) {
+            indent(ofs, 1) << "auto result = object().getOptionalObject(\"" << _decorated.rdfname() << "\");" << std::endl;
+            indent(ofs, 1) << "return result ? std::make_shared<" << propertyClass.genCppNameWithNamespace() << ">(*result) : nullptr;" << std::endl;
+            } else {
             indent(ofs, 1) << "if (i_" << _decorated.prettyIRIName() << " > 0) {" << std::endl;
             indent(ofs, 2) << "return std::make_shared<" << propertyClass.genCppNameWithNamespace() << ">("
             	<< "SK_" << _decorated.prettyIRIName() << "[i_" << _decorated.prettyIRIName() << "]"
@@ -161,13 +178,16 @@ void ObjectProperty::generateDefinition(std::ostream& ofs, const Klass& onClass)
             indent(ofs, 1) << "} else {" << std::endl;
             indent(ofs, 2) << "return nullptr;" << std::endl;
             indent(ofs, 1) << "}" << std::endl;
+            }
             ofs << "}" << std::endl;
         }
     }
     if ( _decorated.maxCardinality(onClass.decorated()) > 1 ) {
         ofs << "std::vector<" << propertyClass.genCppNameWithNamespace() << "> " << currentClassName << "::" <<
                 _decorated.prettyIRIName() << "List() const {" << std::endl;
-        // indent(ofs, 1) << "return object().getObjectListImpl<" << propertyClass.genCppNameWithNamespace() << ">(\"" <<  _decorated.rdfname() << "\", " << orderedBoolValue() << ");" << std::endl;
+        if (!genStaticModel()) {
+        indent(ofs, 1) << "return object().getObjectListImpl<" << propertyClass.genCppNameWithNamespace() << ">(\"" <<  _decorated.rdfname() << "\", " << orderedBoolValue() << ");" << std::endl;
+        } else {
 		indent(ofs, 1) << "std::vector<" << propertyClass.genCppNameWithNamespace() << "> ret;" << std::endl;
 		indent(ofs, 1) << "ret.reserve(" << "c_" << _decorated.prettyIRIName() << ");" << std::endl;
 		indent(ofs, 1) << "for (uint64_t i=0; i < c_" << _decorated.prettyIRIName() << "; i++) {" << std::endl;
@@ -178,17 +198,22 @@ void ObjectProperty::generateDefinition(std::ostream& ofs, const Klass& onClass)
 			<< ");" << std::endl;
 		indent(ofs, 1) << "}" << std::endl;
 		indent(ofs, 1) << "return ret;" << std::endl;
+        }
         ofs << "}" << std::endl;
         ofs << std::endl;
-        // generateDefinitionSetterForMany(ofs, onClass);
+        if (!genStaticModel()) {
+        generateDefinitionSetterForMany(ofs, onClass);
+        }
     }
     ofs << std::endl;
-    // generateDefinitionSetterForOne(ofs, onClass);
-    // if ( _decorated.minCardinality(onClass.decorated()) != _decorated.maxCardinality(onClass.decorated()) ) {
-    //     ofs << std::endl;
-    //     generateRemoverDefinition(ofs, onClass);
-    // }
-    // ofs << std::endl;
+    if (!genStaticModel()) {
+    generateDefinitionSetterForOne(ofs, onClass);
+    if ( _decorated.minCardinality(onClass.decorated()) != _decorated.maxCardinality(onClass.decorated()) ) {
+        ofs << std::endl;
+        generateRemoverDefinition(ofs, onClass);
+    }
+    ofs << std::endl;
+    }
 }
 
 void ObjectProperty::generateDeclarationSetterForOne(std::ostream& ofs, const Klass& onClass) const {
@@ -378,7 +403,7 @@ void ObjectProperty::generateSaverGenLoaderData(std::ostream& ofs, const Klass& 
     std::string storageClassName = onClass.decorated().prettyIRIName();
     bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
 
-	indent(ofs, 1) << "ofs << \"static const size_t " << storageClassName << "_SL_" << _decorated.prettyIRIName() << " = " << storageClassName << "_" << name() << "_values.size();\\n\";" << std::endl;
+	indent(ofs, 1) << "ofs << \"static const size_t " << storageClassName << "_SL_" << _decorated.prettyIRIName() << " = \" << " << storageClassName << "_" << name() << "_values.size()" << " << \";\\n\";" << std::endl;
 	indent(ofs, 1) << "ofs << \"static uint64_t " << storageClassName << "_SK_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
 	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
 	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
@@ -405,7 +430,7 @@ void ObjectProperty::generateSaverGenLoaderData(std::ostream& ofs, const Klass& 
 void ObjectProperty::generateSaverGenLoaderLoad(std::ostream& ofs, const Klass& onClass) const {
     std::string storageClassName = onClass.decorated().prettyIRIName();
     bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
-	indent(ofs, 1) << "ofs << \"" << storageClassName << "::initS_" << _decorated.prettyIRIName() << "("
+	indent(ofs, 1) << "ofs << \"" << onClass.genCppNameWithNamespace(false) << "::initS_" << _decorated.prettyIRIName() << "("
 			<< storageClassName << "_SK_" << _decorated.prettyIRIName()
 			<< ", " << storageClassName << "_SI_" << _decorated.prettyIRIName();
 	if (forMany) {

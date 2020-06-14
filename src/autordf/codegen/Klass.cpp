@@ -25,7 +25,9 @@ void Klass::generateDeclaration(uint64_t iKlass) const {
     ofs << "#include <set>" << std::endl;
     ofs << "#include <iosfwd>" << std::endl;
     ofs << "#include <autordf/Object.h>" << std::endl;
+    if (genStaticModel()) {
     ofs << "#include <All.h>" << std::endl;
+    }
     ofs << "#include <" << genCppNameSpaceInclusionPath() << "/I" << cppName << ".h>" << std::endl;
     for ( auto const& ancestor: _decorated.getAllAncestors() ) {
         ofs << "#include <" << uri2Klass(ancestor->rdfname()).genCppNameSpaceInclusionPath() << "/I" <<
@@ -45,38 +47,37 @@ void Klass::generateDeclaration(uint64_t iKlass) const {
     ofs << ", public I" << cppName << " {" << std::endl;
     ofs << "public:" << std::endl;
     ofs << std::endl;
-    // indent(ofs, 1) << "/**" << std::endl;
-    // indent(ofs, 1) << " * @brief Creates new object, to given iri." << std::endl;
-    // indent(ofs, 1) << " * " << std::endl;
-    // indent(ofs, 1) << " * If iri empty, creates an anonymous (aka blank) object" << std::endl;
-    // indent(ofs, 1) << " */" << std::endl;
-    // indent(ofs, 1) << "explicit " << cppName << "(const std::string& iri = \"\");" << std::endl;
-    // if ( _decorated.oneOfValues().size() ) {
-    //     indent(ofs, 1) << std::endl;
-    //     indent(ofs, 1) << "/**" << std::endl;
-    //     indent(ofs, 1) << " * @brief Load enum from RDF model, from given C++ Type enum." << std::endl;
-    //     indent(ofs, 1) << " * " << std::endl;
-    //     indent(ofs, 1) << " * This applies only to classes defines using the owl:oneOf paradigm" << std::endl;
-    //     indent(ofs, 1) << " */" << std::endl;
-    //     indent(ofs, 1) << "explicit " << cppName << "(I" << cppName << "::Enum enumVal);" << std::endl;
-    // }
-    // ofs << std::endl;
-    // indent(ofs, 1) << "/**" << std::endl;
-    // indent(ofs, 1) << " * @brief Build us using the same underlying resource as the other object" << std::endl;
-    // indent(ofs, 1) << " */" << std::endl;
-    // indent(ofs, 1) << "explicit " << cppName << "(const Object& other);" << std::endl;
-    // ofs << std::endl;
-    // indent(ofs, 1) << "/**" << std::endl;
-    // indent(ofs, 1) << " * @brief Clone the object, to given iri" << std::endl;
-    // indent(ofs, 1) << " * " << std::endl;
-    // indent(ofs, 1) << " * Object is copied by duplicating all it properties values. " << std::endl;
-    // indent(ofs, 1) << " * @param iri if empty, creates an anonymous (aka blank) object." << std::endl;
-    // indent(ofs, 1) << " */" << std::endl;
-    // indent(ofs, 1) << cppName << " clone(const autordf::Uri& iri = \"\") const {" << std::endl;
-    // indent(ofs, 2) <<     "return Object::clone(iri).as<" << cppName << ">();" << std::endl;
-    // indent(ofs, 1) << "}" << std::endl;
-    // ofs << std::endl;
-
+    if (!genStaticModel()) {
+    indent(ofs, 1) << "/**" << std::endl;
+    indent(ofs, 1) << " * @brief Creates new object, to given iri." << std::endl;
+    indent(ofs, 1) << " * " << std::endl;
+    indent(ofs, 1) << " * If iri empty, creates an anonymous (aka blank) object" << std::endl;
+    indent(ofs, 1) << " */" << std::endl;
+    indent(ofs, 1) << "explicit " << cppName << "(const std::string& iri = \"\");" << std::endl;
+    if ( _decorated.oneOfValues().size() ) {
+        indent(ofs, 1) << std::endl;
+        indent(ofs, 1) << "/**" << std::endl;
+        indent(ofs, 1) << " * @brief Load enum from RDF model, from given C++ Type enum." << std::endl;
+        indent(ofs, 1) << " * " << std::endl;
+        indent(ofs, 1) << " * This applies only to classes defines using the owl:oneOf paradigm" << std::endl;
+        indent(ofs, 1) << " */" << std::endl;
+        indent(ofs, 1) << "explicit " << cppName << "(I" << cppName << "::Enum enumVal);" << std::endl;
+    }
+    ofs << std::endl;
+    indent(ofs, 1) << "/**" << std::endl;
+    indent(ofs, 1) << " * @brief Build us using the same underlying resource as the other object" << std::endl;
+    indent(ofs, 1) << " */" << std::endl;
+    indent(ofs, 1) << "explicit " << cppName << "(const Object& other);" << std::endl;
+    ofs << std::endl;
+    indent(ofs, 1) << "/**" << std::endl;
+    indent(ofs, 1) << " * @brief Clone the object, to given iri" << std::endl;
+    indent(ofs, 1) << " * " << std::endl;
+    indent(ofs, 1) << " * Object is copied by duplicating all it properties values. " << std::endl;
+    indent(ofs, 1) << " * @param iri if empty, creates an anonymous (aka blank) object." << std::endl;
+    indent(ofs, 1) << " */" << std::endl;
+    indent(ofs, 1) << cppName << " clone(const autordf::Uri& iri = \"\") const {" << std::endl;
+    indent(ofs, 2) <<     "return Object::clone(iri).as<" << cppName << ">();" << std::endl;
+    } else {
 
     indent(ofs, 1) << "explicit " << cppName << "(uint64_t klassId, uint64_t storageIndex): autordf::Object(\"\", \"\", klassId, storageIndex) {" << std::endl;
     int i = 1;
@@ -97,6 +98,7 @@ void Klass::generateDeclaration(uint64_t iKlass) const {
 	for ( const std::shared_ptr<ontology::ObjectProperty>& prop : _decorated.objectProperties()) {
 		i = ObjectProperty(*prop.get()).generateSetIndices(ofs, *this, i);
 	}
+    }
     indent(ofs, 1) << "}" << std::endl;
     ofs << std::endl;
     
@@ -106,30 +108,17 @@ void Klass::generateDeclaration(uint64_t iKlass) const {
     indent(ofs, 1) << "static std::vector<" << cppName << "> find();" << std::endl;
     ofs << std::endl;
 
+    if (!genStaticModel()) {
+    for ( const std::shared_ptr<ontology::DataProperty>& key : _decorated.dataKeys()) {
+        DataProperty(*key.get()).generateKeyDeclaration(ofs, _decorated, 0, 0);
+    }
+
+    for ( const std::shared_ptr<ontology::ObjectProperty>& key : _decorated.objectKeys()) {
+        ObjectProperty(*key.get()).generateKeyDeclaration(ofs, _decorated, 0, 0);
+    }
+
+    } else {
 	size_t sz = storageSize();
-
-    // indent(ofs, 1) << "static " << cppName << " instance(uint64_t klassId, uint64_t storageIndex) {" << std::endl;
-    // indent(ofs, 2) << "// FIXME: use klassId" << std::endl;
-    // indent(ofs, 2) << "return " << cppName << "(storageIndex * " << sz << ");" << std::endl;
-    // indent(ofs, 1) << "}" << std::endl;
-    // ofs << std::endl;
-
-    // indent(ofs, 1) << "static std::shared_ptr<" << cppName << "> instancePtr(uint64_t klassId, uint64_t storageIndex) {" << std::endl;
-    // indent(ofs, 2) << "// FIXME: use klassId" << std::endl;
-    // indent(ofs, 2) << "return std::make_shared<" << cppName << ">(storageIndex * " << sz << ");" << std::endl;
-    // indent(ofs, 1) << "}" << std::endl;
-    // ofs << std::endl;
-
-    // indent(ofs, 1) << "static std::vector<" << cppName << "> instances(uint64_t* klassIdStorageBegin, uint64_t* identityStorageBegin, uint64_t storageLength) {" << std::endl;
-    // indent(ofs, 2) << "std::vector<" << cppName << "> ret;" << std::endl;
-    // indent(ofs, 2) << "ret.reserve(storageLength);" << std::endl;
-    // indent(ofs, 2) << "for (size_t i=0; i < storageLength; i++) {" << std::endl;
-    // indent(ofs, 3) << "ret.push_back(" << cppName << "::instance(*(klassIdStorageBegin + i), *(identityStorageBegin + i)));" << std::endl;
-    // indent(ofs, 2) << "}" << std::endl;
-    // indent(ofs, 2) << "return ret;" << std::endl;
-    // indent(ofs, 1) << "}" << std::endl;
-    // ofs << std::endl;
-
 	size_t propIndex = 0;
     for ( const std::shared_ptr<ontology::DataProperty>& key : _decorated.dataKeys()) {
     	DataProperty dp(*key.get());
@@ -147,23 +136,21 @@ void Klass::generateDeclaration(uint64_t iKlass) const {
 
 	indent(ofs, 1) << "static void initInstances(uint64_t* storage, size_t len);\n" << std::endl;
 
-
+    }
     ofs << "private:" << std::endl;
 
-    // indent(ofs, 1) << "Object& object() override { return *this; }" << std::endl;
-    // indent(ofs, 1) << "const Object& object() const override { return *this; }" << std::endl;
-
+    if (!genStaticModel()) {
+    indent(ofs, 1) << "Object& object() override { return *this; }" << std::endl;
+    indent(ofs, 1) << "const Object& object() const override { return *this; }" << std::endl;
+    } else {
 	indent(ofs, 1) << "static uint64_t KLASS_ID;" << std::endl;
 	indent(ofs, 1) << "static uint64_t* INSTANCES;" << std::endl;
 	indent(ofs, 1) << "static size_t INSTANCES_LENGTH;" << std::endl;
-
+    }
     ofs << "};" << std::endl;
     ofs << std::endl;
-
-    ofs << std::endl;
-
     leaveNameSpace(ofs);
-
+    if (genStaticModel()) {
     ofs << "namespace autordf {" << std::endl;
     ofs << "template<> inline " << genCppNameSpaceFullyQualified() << "::" << cppName  << " autordf::Object::as() {" << std::endl;
     indent(ofs, 1) << "return " << genCppNameSpaceFullyQualified() << "::" << cppName << "(_klass, _identity);" << std::endl;
@@ -172,6 +159,7 @@ void Klass::generateDeclaration(uint64_t iKlass) const {
     indent(ofs, 1) << "return _klass == " << iKlass << ";" << std::endl;
     ofs << "}" << std::endl;
     ofs << "}" << std::endl;
+    }
 
     generateCodeProtectorEnd(ofs, genCppNameSpaceFullyQualified(), cppName);
 }
@@ -190,16 +178,18 @@ void Klass::generateDefinition(uint64_t iKlass) const {
 
     enterNameSpace(ofs);
     ofs << std::endl;
-    // ofs << cppName << "::" << cppName << "(const std::string& iri) : autordf::Object(iri, I" << cppName << "::TYPEIRI) {" << std::endl;
-    // ofs << "}" << std::endl;
-    // if ( _decorated.oneOfValues().size() ) {
-    //     ofs << std::endl;
-    //     ofs << cppName << "::"<< cppName << "(I" << cppName << "::Enum enumVal) : autordf::Object(enumIri(enumVal)) {}" << std::endl;
-    // }
-    // ofs << std::endl;
-    // ofs << cppName << "::" << cppName << "(const Object& other) : autordf::Object(other) {" << std::endl;
-    // ofs << "}" << std::endl;
-    // ofs << std::endl;
+    if (!genStaticModel()) {
+    ofs << cppName << "::" << cppName << "(const std::string& iri) : autordf::Object(iri, I" << cppName << "::TYPEIRI) {" << std::endl;
+    ofs << "}" << std::endl;
+    if ( _decorated.oneOfValues().size() ) {
+        ofs << std::endl;
+        ofs << cppName << "::"<< cppName << "(I" << cppName << "::Enum enumVal) : autordf::Object(enumIri(enumVal)) {}" << std::endl;
+    }
+    ofs << std::endl;
+    ofs << cppName << "::" << cppName << "(const Object& other) : autordf::Object(other) {" << std::endl;
+    ofs << "}" << std::endl;
+    ofs << std::endl;
+    } else {
 
 	ofs << "uint64_t " << cppName << "::KLASS_ID = " << iKlass <<";" << std::endl;
 	ofs << "uint64_t* " << cppName << "::INSTANCES = nullptr;" << std::endl;
@@ -212,11 +202,12 @@ void Klass::generateDefinition(uint64_t iKlass) const {
 	
 	ofs << "}" << std::endl;
 	ofs << std::endl;
-
-	size_t objSize = storageSize();
-
+    }
     ofs << "std::vector<" << cppName << "> " << cppName << "::find() {" << std::endl;
-    // indent(ofs, 1) << "return findHelper<" << cppName << ">(I" << cppName << "::TYPEIRI);" << std::endl;
+    if (!genStaticModel()) {
+    indent(ofs, 1) << "return findHelper<" << cppName << ">(I" << cppName << "::TYPEIRI);" << std::endl;
+    } else {
+    size_t objSize = storageSize();
     indent(ofs, 1) << "std::vector<" << cppName << "> ret;" << std::endl;
     indent(ofs, 1) << "ret.reserve((INSTANCES_LENGTH - 1) / " << objSize << ");" << std::endl;
     indent(ofs, 1) << "for (size_t i=1; i < INSTANCES_LENGTH; i += " << objSize << ") {" << std::endl;
@@ -224,6 +215,7 @@ void Klass::generateDefinition(uint64_t iKlass) const {
     indent(ofs, 1) << "}" << std::endl;
     // FIXME: find should return subclasses ?
     indent(ofs, 1) << "return ret;" << std::endl;
+    }
     ofs << "}" << std::endl;
     ofs << std::endl;
     leaveNameSpace(ofs);
@@ -295,6 +287,9 @@ void Klass::generateInterfaceDeclaration() const {
         indent(ofs, 1) << " * @return enum value" << std::endl;
         indent(ofs, 1) << " * @throw InvalidEnum if the object we try to convert is not one of the instances defined by owl:oneOf" << std::endl;
         indent(ofs, 1) << " */ " << std::endl;
+        if (!genStaticModel()) {
+        indent(ofs, 1) << "Enum asEnum() const;" << std::endl;
+        } else {
         indent(ofs, 1) << "Enum asEnum() const {" << std::endl;
         indent(ofs, 2) << "if (v_enum == 0) {" << std::endl;
         indent(ofs, 3) << "throw autordf::InvalidEnum(\"Object is not a valid enum member\");" << std::endl;
@@ -302,6 +297,7 @@ void Klass::generateInterfaceDeclaration() const {
         indent(ofs, 3) << "return static_cast<Enum>(v_enum - 1);" << std::endl;
         indent(ofs, 2) << "}" << std::endl;
         indent(ofs, 1) << "}" << std::endl;
+        }
         ofs << std::endl;
         indent(ofs, 1) << "/** " << std::endl;
         indent(ofs, 1) << " * @brief Converts an enum value to a pretty string " << std::endl;
@@ -328,16 +324,18 @@ void Klass::generateInterfaceDeclaration() const {
     }
     ofs << std::endl;
 
-    // indent(ofs, 1) << "/**" << std::endl;
-    // indent(ofs, 1) << " * @brief returns the object this interface object applies to" << std::endl;
-    // indent(ofs, 1) << " **/" << std::endl;
-    // indent(ofs, 1) << "virtual autordf::Object& object() = 0;" << std::endl;
-    // ofs << std::endl;
-    // indent(ofs, 1) << "/**" << std::endl;
-    // indent(ofs, 1) << " * @brief returns the object this interface object applies to" << std::endl;
-    // indent(ofs, 1) << " **/" << std::endl;
-    // indent(ofs, 1) << "virtual const autordf::Object& object() const = 0;" << std::endl;
-    // ofs << std::endl;
+    if (!genStaticModel()) {
+    indent(ofs, 1) << "/**" << std::endl;
+    indent(ofs, 1) << " * @brief returns the object this interface object applies to" << std::endl;
+    indent(ofs, 1) << " **/" << std::endl;
+    indent(ofs, 1) << "virtual autordf::Object& object() = 0;" << std::endl;
+    ofs << std::endl;
+    indent(ofs, 1) << "/**" << std::endl;
+    indent(ofs, 1) << " * @brief returns the object this interface object applies to" << std::endl;
+    indent(ofs, 1) << " **/" << std::endl;
+    indent(ofs, 1) << "virtual const autordf::Object& object() const = 0;" << std::endl;
+    ofs << std::endl;
+    }
     ofs << "private:" << std::endl;
     if ( _decorated.oneOfValues().size() ) {
         indent(ofs, 1) << "typedef std::tuple<Enum, const char *, const char *> EnumArrayEntryType;" << std::endl;
@@ -351,7 +349,9 @@ void Klass::generateInterfaceDeclaration() const {
         indent(ofs, 1) << cppName << "() {}" << std::endl;
         indent(ofs, 1) << cppName << "( const " << cppName << "&) {}" << std::endl;
         indent(ofs, 1) << "static std::string enumIri(Enum en);" << std::endl;
+        if (genStaticModel()) {
         indent(ofs, 1) << "uint64_t v_enum;" << std::endl;
+        }
         stopInternal(ofs, 1);
     }
 
@@ -359,21 +359,23 @@ void Klass::generateInterfaceDeclaration() const {
     leaveNameSpace(ofs);
 
     ofs << std::endl;
-    // if ( _decorated.oneOfValues().size() ) {
-    //     std::string cppNameSpace;
-    //     if ( outdir != "." ) {
-    //         cppNameSpace.append(outdir + "::");
-    //     }
-    //     cppNameSpace.append(genCppNameSpace() + "::");
+    if (!genStaticModel()) {
+    if ( _decorated.oneOfValues().size() ) {
+        std::string cppNameSpace;
+        if ( outdir != "." ) {
+            cppNameSpace.append(outdir + "::");
+        }
+        cppNameSpace.append(genCppNameSpace() + "::");
 
-    //     ofs << "/**" << std::endl;
-    //     ofs << " * Dumps string representation of Enumerated type " << std::endl;
-    //     ofs << " */" << std::endl;
-    //     ofs << "inline std::ostream& operator<<(std::ostream& os, " << cppNameSpace << cppName << "::Enum val) {" << std::endl;
-    //     indent(ofs, 1) << "os << " << cppNameSpace << cppName << "::enumString(val);" << std::endl;
-    //     indent(ofs, 1) << "return os;" << std::endl;
-    //     ofs << "}" << std::endl;
-    // }
+        ofs << "/**" << std::endl;
+        ofs << " * Dumps string representation of Enumerated type " << std::endl;
+        ofs << " */" << std::endl;
+        ofs << "inline std::ostream& operator<<(std::ostream& os, " << cppNameSpace << cppName << "::Enum val) {" << std::endl;
+        indent(ofs, 1) << "os << " << cppNameSpace << cppName << "::enumString(val);" << std::endl;
+        indent(ofs, 1) << "return os;" << std::endl;
+        ofs << "}" << std::endl;
+    }
+    }
 
     generateCodeProtectorEnd(ofs, genCppNameSpaceFullyQualified(), cppName);
 }
@@ -426,14 +428,16 @@ void Klass::generateInterfaceDefinition() const {
         indent(ofs, 1) << "throw autordf::InvalidEnum(ss.str());" << std::endl;
         ofs << "};" << std::endl;
 
-        // ofs << std::endl;
-        // ofs << "I" << _decorated.prettyIRIName() << "::Enum I" << _decorated.prettyIRIName() << "::asEnum() const {" << std::endl;
-        // indent(ofs, 1) << "for ( auto const& enumItem: ENUMARRAY) {" << std::endl;
-        // indent(ofs, 2) << "if ( object().iri() == std::get<1>(enumItem) ) return std::get<0>(enumItem);" << std::endl;
-        // indent(ofs, 1) << "}" << std::endl;
-        // indent(ofs, 1) << "throw autordf::InvalidEnum(object().iri() + \" is not a valid individual for owl:oneOf type " <<
-        //         _decorated.prettyIRIName() << "\");" << std::endl;
-        // ofs << "}" << std::endl;
+        if (!genStaticModel()) {
+        ofs << std::endl;
+        ofs << "I" << _decorated.prettyIRIName() << "::Enum I" << _decorated.prettyIRIName() << "::asEnum() const {" << std::endl;
+        indent(ofs, 1) << "for ( auto const& enumItem: ENUMARRAY) {" << std::endl;
+        indent(ofs, 2) << "if ( object().iri() == std::get<1>(enumItem) ) return std::get<0>(enumItem);" << std::endl;
+        indent(ofs, 1) << "}" << std::endl;
+        indent(ofs, 1) << "throw autordf::InvalidEnum(object().iri() + \" is not a valid individual for owl:oneOf type " <<
+                _decorated.prettyIRIName() << "\");" << std::endl;
+        ofs << "}" << std::endl;
+        }
         ofs << std::endl;
 
         ofs << "std::string I" << _decorated.prettyIRIName() << "::enumIri(Enum enumVal) {" << std::endl;
@@ -505,6 +509,12 @@ size_t Klass::storageSize() const {
 			i += ObjectProperty(*prop.get()).storageSize(Klass(*ancestor.get()));
 		}
     }
+	for ( const std::shared_ptr<ontology::DataProperty>& prop : decorated().dataProperties()) {
+		i += DataProperty(*prop.get()).storageSize(*this);
+	}
+	for ( const std::shared_ptr<ontology::ObjectProperty>& prop : decorated().objectProperties()) {
+		i += ObjectProperty(*prop.get()).storageSize(*this);
+	}
     if (i == 0) {
     	i+= 1; // instances can't be empty, even if no property
     }
@@ -522,6 +532,7 @@ void Klass::generateSaverInitKlassIdsIdentities(std::ofstream& ofs, uint64_t iKl
 	indent(ofs, 3) << "}" << std::endl;
 	indent(ofs, 3) << "identity += " << storageSize() << ";" << std::endl;
 	indent(ofs, 2) << "}" << std::endl;
+	indent(ofs, 2) << _decorated.prettyIRIName() << "_INSTANCES.resize(identity, 0);" << std::endl;
 	indent(ofs, 1) << "}" << std::endl;
 }
 
@@ -551,15 +562,15 @@ void Klass::generateSaverInstanceSave(std::ofstream& ofs, uint64_t iKlass) const
 }
 
 void Klass::generateSaverGenLoaderData(std::ostream& ofs, uint64_t iKlass) const {
-	for (auto const& ancestor: decorated().getAllAncestors()) {
-		Klass ancestorCls(*ancestor.get());
-		for (const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
-			DataProperty(*prop.get()).generateSaverGenLoaderData(ofs, ancestorCls);
-		}
-		for (const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
-			ObjectProperty(*prop.get()).generateSaverGenLoaderData(ofs, ancestorCls);
-		}
-	}
+	// for (auto const& ancestor: decorated().getAllAncestors()) {
+	// 	Klass ancestorCls(*ancestor.get());
+	// 	for (const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
+	// 		DataProperty(*prop.get()).generateSaverGenLoaderData(ofs, ancestorCls);
+	// 	}
+	// 	for (const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
+	// 		ObjectProperty(*prop.get()).generateSaverGenLoaderData(ofs, ancestorCls);
+	// 	}
+	// }
 	for (const std::shared_ptr<ontology::DataProperty>& prop : decorated().dataProperties()) {
 		DataProperty(*prop.get()).generateSaverGenLoaderData(ofs, *this);
 	}
@@ -576,15 +587,15 @@ void Klass::generateSaverGenLoaderData(std::ostream& ofs, uint64_t iKlass) const
 }
 
 void Klass::generateSaverGenLoaderLoad(std::ostream& ofs, uint64_t iKlass) const {
-	for (auto const& ancestor: decorated().getAllAncestors()) {
-		Klass ancestorCls(*ancestor.get());
-		for (const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
-			DataProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, ancestorCls);
-		}
-		for (const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
-			ObjectProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, ancestorCls);
-		}
-	}
+	// for (auto const& ancestor: decorated().getAllAncestors()) {
+	// 	Klass ancestorCls(*ancestor.get());
+	// 	for (const std::shared_ptr<ontology::DataProperty>& prop : ancestorCls.decorated().dataProperties()) {
+	// 		DataProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, ancestorCls);
+	// 	}
+	// 	for (const std::shared_ptr<ontology::ObjectProperty>& prop : ancestorCls.decorated().objectProperties()) {
+	// 		ObjectProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, ancestorCls);
+	// 	}
+	// }
 	for (const std::shared_ptr<ontology::DataProperty>& prop : decorated().dataProperties()) {
 		DataProperty(*prop.get()).generateSaverGenLoaderLoad(ofs, *this);
 	}

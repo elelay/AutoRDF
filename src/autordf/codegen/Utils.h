@@ -23,7 +23,9 @@ void createDirectory(const std::string& relativeDirName);
 
 void createFile(const std::string& fileName, std::ofstream *ofs);
 
-extern bool genStaticModel;
+bool genStaticModel();
+void setGenStaticModel(bool genStatic);
+
 }
 }
 

@@ -14,6 +14,7 @@ int main() {
 
     f.loadFromFile(boost::filesystem::path(__FILE__).parent_path().string() + "/../../unittests/foafExample.rdf");
 
+
     // We can do that
     std::vector<autordf::Object> list = autordf::Object::findByType("http://xmlns.com/foaf/0.1/Person");
     foaf::Person p1 = list.front().as<foaf::Person>();

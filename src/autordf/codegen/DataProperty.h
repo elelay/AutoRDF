@@ -46,6 +46,7 @@ public:
 
 private:
     std::pair<cvt::RdfTypeEnum, std::string> getRdfCppTypes(const Klass& onClass) const;
+    std::string getRdfCppNullValue(const Klass& onClass) const;
 
     void generateGetterForOneMandatory(std::ostream& ofs, const Klass& onClass) const;
 
