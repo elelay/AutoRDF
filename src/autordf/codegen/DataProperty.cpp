@@ -107,7 +107,8 @@ void DataProperty::generateDeclaration(std::ostream& ofs, const Klass& onClass) 
 uint64_t DataProperty::storageSize(const Klass& onClass) const {
     std::pair<cvt::RdfTypeEnum, std::string> rdfCppType = getRdfCppTypes(onClass);
     bool forMany = _decorated.maxCardinality(onClass.decorated()) > 1;
-    return forMany ? 2 : (rdfCppType.second.empty() ? 3 : 1);
+    // TODO: make it more compact by storing 3 indices when no fixed type: yes 3 int64 per instance, but value, language and type deduplicated separately
+    return forMany ? 2 : 1; // if not forMany, simply store the index in SV/SLANG/STYPE
 }
 
 void DataProperty::generateStorage(std::ostream& ofs, const Klass& onClass, bool optional, bool forMany) const {
@@ -591,7 +592,7 @@ int DataProperty::generateSetIndices(std::ostream& ofs, const Klass& onClass, in
 	indent(ofs, 2) << currentClassName << "::i_" << name() << " = *(base_ptr + " << i << ");" << std::endl;
 	i++;
 	if (_decorated.maxCardinality(onClass.decorated()) > 1) {
-		indent(ofs, 2) << currentClassName << "::c_" << name() << " = *(base_ptr + " << i + 1 << ");" << std::endl;
+		indent(ofs, 2) << currentClassName << "::c_" << name() << " = *(base_ptr + " << i << ");" << std::endl;
 		i++;
 	}
 	return i;
@@ -726,9 +727,8 @@ void DataProperty::generateSaverGenLoaderData(std::ostream& ofs, const Klass& on
 	}
 	if (forMany) {
     	indent(ofs, 1) << "ofs << \"static uint64_t " << storageClassName << "_SARR_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
-    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
     	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_ARR) {" << std::endl;
-    	indent(ofs, 2) << "ofs << \", \" << v << std::endl;" << std::endl;
+    	indent(ofs, 2) << "ofs << v << \", \" << std::endl;" << std::endl;
     	indent(ofs, 1) << "}" << std::endl;
     	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
 	}

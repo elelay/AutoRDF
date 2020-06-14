@@ -29,5 +29,6 @@
     foaf:name "Jimmy Wales" ;
     foaf:nick "Jimbo" ;
     foaf:publications <http://www.jimmywales.com/pubs/publications.rdf> ;
-    foaf:title "Mr." .
+    foaf:title "Mr." ;
+    foaf:age 10.
 

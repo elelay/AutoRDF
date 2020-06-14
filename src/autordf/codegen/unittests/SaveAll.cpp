@@ -6,11 +6,14 @@
 
 #include <iostream>
 
-int main() {
+int main(int argc, char** argv) {
     autordf::Factory f;
     autordf::Object::setFactory(&f);
-
-    f.loadFromFile(boost::filesystem::path(__FILE__).parent_path().string() + "/../../unittests/foafExample.ttl");
+    if (argc != 2) {
+    	std::cerr << "Usage: " << argv[0] << "<INPUT DATA TTL>" << std::endl;
+    	return 1;
+    }
+    f.loadFromFile(argv[1]);
 
     Saver::saveAll(".");
 }

@@ -80,7 +80,7 @@ void Klass::generateDeclaration(uint64_t iKlass) const {
     } else {
 
     indent(ofs, 1) << "explicit " << cppName << "(uint64_t klassId, uint64_t storageIndex): autordf::Object(\"\", \"\", klassId, storageIndex) {" << std::endl;
-    int i = 1;
+    int i = 0;
     indent(ofs, 2) << "uint64_t* base_ptr = All::INSTANCES[klassId] + (storageIndex + All::PARENT_OFFSET[klassId][" << cppName << "::KLASS_ID]);" << std::endl;
     for ( auto const& ancestor: _decorated.getAllAncestors() ) {
     	indent(ofs, 2) << "// " << ancestor->prettyIRIName() << " fields" << std::endl;
@@ -538,7 +538,7 @@ void Klass::generateSaverInitKlassIdsIdentities(std::ofstream& ofs, uint64_t iKl
 
 void Klass::generateSaverInstanceSave(std::ofstream& ofs, uint64_t iKlass) const {
 	indent(ofs, 1) << "{ // " << _decorated.prettyIRIName() << std::endl;
-	indent(ofs, 1) << "uint64_t identity = 1;" << std::endl;
+	indent(ofs, 1) << "uint64_t identity = 0;" << std::endl;
 	indent(ofs, 1) << "for(auto const& obj: " << genCppNameWithNamespace(false) << "::find()) {" << std::endl;
 	int propOffset = 0;
 	for (auto const& ancestor: decorated().getAllAncestors()) {

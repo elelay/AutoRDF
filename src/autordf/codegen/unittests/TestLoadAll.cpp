@@ -21,6 +21,18 @@ int main() {
     	for (auto n: p.nameList()) {
     		std::cout << " - " << n << std::endl;
     	}
+    	std::cout << " knows " << p.knowsList().size() << " persons(s)" << std::endl;
+    	for (auto other: p.knowsList()) {
+    		if (other.nameList().size() > 0) {
+    			std::cout << " - " << other.nameList().front() << std::endl;
+			} else {
+				std::cout << "(unnamed)" << std::endl;
+			}
+    	}
+    	if (p.ageOptional()) {
+    		std::cout << "age = " << p.age("10") << std::endl;
+    	}
+    	std::cout << "-------" << std::endl;
     }
     // FIXME: why is givenName Lost ?
     // std::cout << "  knows : ";

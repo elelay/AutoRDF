@@ -307,10 +307,10 @@ void ObjectProperty::generateRemoverDefinition(std::ostream& ofs, const Klass& o
 int ObjectProperty::generateSetIndices(std::ostream& ofs, const Klass& onClass, int i) const {
     std::string currentClassName = "I" + onClass.decorated().prettyIRIName();
 
-	indent(ofs, 2) << currentClassName << "::i_" << name() << " = INSTANCES[storageIndex + " << i << "];" << std::endl;
+	indent(ofs, 2) << currentClassName << "::i_" << name() << " = *(base_ptr + " << i << ");" << std::endl;
 	i++;
 	if (_decorated.maxCardinality(onClass.decorated()) > 1) {
-		indent(ofs, 2) << currentClassName << "::c_" << name() << " = INSTANCES[storageIndex + " << i << "];" << std::endl;
+		indent(ofs, 2) << currentClassName << "::c_" << name() << " = *(base_ptr + " << i << ");" << std::endl;
 		i++;
 	}
 	return i;
@@ -419,9 +419,8 @@ void ObjectProperty::generateSaverGenLoaderData(std::ostream& ofs, const Klass& 
 	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
 	if (forMany) {
     	indent(ofs, 1) << "ofs << \"static uint64_t " << storageClassName << "_SARR_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
-    	indent(ofs, 1) << "ofs << \"0\" << std::endl;" << std::endl;
     	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_ARR) {" << std::endl;
-    	indent(ofs, 2) << "ofs << \", \" << v << std::endl;" << std::endl;
+    	indent(ofs, 2) << "ofs << v << \", \" << std::endl;" << std::endl;
     	indent(ofs, 1) << "}" << std::endl;
     	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
 	}
