@@ -354,10 +354,10 @@ int ObjectProperty::generateSaverInstanceSave(std::ostream& ofs, const Klass& on
     auto propertyClass = effectiveClass(onClass);
 
 	indent(ofs, 2) << "{ // " << currentClassName << " " << storageClassName << "::" << _decorated.prettyIRIName() << std::endl;
-	if (_decorated.maxCardinality(onClass.decorated()) <= 1) {
-		if (_decorated.minCardinality(onClass.decorated()) > 0) {
+	if (_decorated.maxCardinality(storageClass.decorated()) <= 1) {
+		if (_decorated.minCardinality(storageClass.decorated()) > 0) {
 			indent(ofs, 3) << "uint64_t i=1;" << std::endl;
-			indent(ofs, 3) << "auto const& objV = obj." << _decorated.prettyIRIName() << "());" << std::endl;
+			indent(ofs, 3) << "auto const& objV = obj." << _decorated.prettyIRIName() << "();" << std::endl;
 			indent(ofs, 3) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
 			indent(ofs, 4) << "if (objV == v) {" << std::endl;
 			indent(ofs, 5) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = i;" << std::endl;
@@ -365,8 +365,9 @@ int ObjectProperty::generateSaverInstanceSave(std::ostream& ofs, const Klass& on
 			indent(ofs, 4) << "}" << std::endl;
 			indent(ofs, 4) << "i++;" << std::endl;
 			indent(ofs, 3) << "}" << std::endl;
+			indent(ofs, 3) << "if (" << currentClassName << "_INSTANCES[identity + " << propOffset << "] == 0) { throw std::runtime_error(\"property not found\"); }" << std::endl;
 		} else {
-			indent(ofs, 3) << "std::shared_ptr<" << propertyClass.genCppNameWithNamespace(false) << "> tmp = obj." << _decorated.prettyIRIName() << "Optional();" << std::endl;
+			indent(ofs, 3) << "auto tmp = obj." << _decorated.prettyIRIName() << "Optional();" << std::endl;
 			indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = 0;" << std::endl;
 			indent(ofs, 3) << "if (tmp) {" << std::endl;
 			indent(ofs, 4) << "uint64_t i=1;" << std::endl;
@@ -380,20 +381,25 @@ int ObjectProperty::generateSaverInstanceSave(std::ostream& ofs, const Klass& on
 			indent(ofs, 3) << "}" << std::endl;
 		}
 	} else {  // maxCardinality > 1
-		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = " << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.size();" << std::endl;
-		indent(ofs, 3) << "uint64_t j=0;" << std::endl;
-		indent(ofs, 3) << "for(auto const& p: obj." << _decorated.prettyIRIName() << "List()) {" << std::endl;
-			indent(ofs, 4) << "uint64_t i=1;" << std::endl;
-			indent(ofs, 4) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
-				indent(ofs, 5) << "if (p == v) {" << std::endl;
-					indent(ofs, 6) << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.push_back(i);" << std::endl;
-					indent(ofs, 6) << "break;" << std::endl;
-				indent(ofs, 5) << "}" << std::endl;
-				indent(ofs, 5) << "i++;" << std::endl;
-			indent(ofs, 4) << "}" << std::endl;
-			indent(ofs, 4) << "j++;" << std::endl;
-		indent(ofs, 3) << "}" << std::endl;
-		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1)  << "] = j;" << std::endl;
+	    indent(ofs, 3) << "if(obj." << _decorated.prettyIRIName() << "List().empty()) {" << std::endl;
+	        indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = 0;" << std::endl;
+	        indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1) << "] = 0;" << std::endl;
+        indent(ofs, 3) << "} else {" << std::endl;
+            indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = " << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.size();" << std::endl;
+            indent(ofs, 4) << "uint64_t j=0;" << std::endl;
+            indent(ofs, 4) << "for(auto const& p: obj." << _decorated.prettyIRIName() << "List()) {" << std::endl;
+                indent(ofs, 5) << "uint64_t i=1;" << std::endl;
+                indent(ofs, 5) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+                    indent(ofs, 6) << "if (p == v) {" << std::endl;
+                        indent(ofs, 7) << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.push_back(i);" << std::endl;
+                        indent(ofs, 7) << "break;" << std::endl;
+                    indent(ofs, 6) << "}" << std::endl;
+                    indent(ofs, 6) << "i++;" << std::endl;
+                indent(ofs, 5) << "}" << std::endl;
+                indent(ofs, 5) << "j++;" << std::endl;
+            indent(ofs, 4) << "}" << std::endl;
+            indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1)  << "] = j;" << std::endl;
+        indent(ofs, 3) << "}" << std::endl;
 	}
 	indent(ofs, 2) << "}" << std::endl;
 	return propOffset + storageSize(onClass);

@@ -37,14 +37,14 @@ std::map<cvt::RdfTypeEnum, std::string> rdf2CppTypeMapping(
 std::map<cvt::RdfTypeEnum, std::string> rdf2CppNullValueMapping(
         {
 //FIXME: handle PlainLiteral, XMLLiteral, Literal, real, rational
-        std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_string,             "\"\""),
+        std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_string,             "\"\\\"\\\"\""),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_boolean,            "false"),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_decimal,            "0.0"),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_float,              "0.0f"),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_double,             "0.0"),
-        std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_dateTime,           "boost::posix_time::ptime()"),
+        std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_dateTime,           "\"boost::posix_time::ptime()\""),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_integer,            "0"),
-        std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_dateTimeStamp,      "boost::posix_time::ptime()"),
+        std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_dateTimeStamp,      "\"boost::posix_time::ptime()\""),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_nonNegativeInteger, "0"),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_positiveInteger,    "0"),
         std::pair<cvt::RdfTypeEnum, std::string>(cvt::RdfTypeEnum::xsd_nonPositiveInteger, "0"),
@@ -401,6 +401,18 @@ std::string DataProperty::getRdfCppNullValue(const Klass& onClass) const {
     return "0";
 }
 
+std::string DataProperty::genToLiteral(const Klass& onClass) const {
+    auto rdfTypeEntry = cvt::rdfMapType.find(_decorated.range(&onClass.decorated()));
+
+    if (rdfTypeEntry != cvt::rdfMapType.end()) {
+        if (rdfTypeEntry->second == cvt::RdfTypeEnum::xsd_dateTimeStamp
+            || rdfTypeEntry->second == cvt::RdfTypeEnum::xsd_dateTime) {
+            return "\"autordf::cvt::toCppDateTime(\" << toLiteral(v) << \")\"";
+        }
+    }
+    return "toLiteral(v)";
+}
+
 void DataProperty::generateGetterForOneMandatory(std::ostream& ofs, const Klass& onClass) const {
     std::string methodName = _decorated.prettyIRIName();
     generatePropertyComment(ofs, onClass, methodName, 1,
@@ -426,8 +438,8 @@ void DataProperty::generateGetterForOneMandatory(std::ostream& ofs, const Klass&
         } else {
         indent(ofs, 2) << "return autordf::PropertyValue("
         	<< "SV_" << methodName << "[i_" << methodName << "]"
-        	<< "SLANG_" << methodName << "[i_" << methodName << "]"
-        	<< "STYPE_" << methodName << "[i_" << methodName << "]"
+              	<< ", SLANG_" << methodName << "[i_" << methodName << "]"
+               << ", STYPE_" << methodName << "[i_" << methodName << "]"
         	<< ");" << std::endl;
         }
         indent(ofs, 1) << "}" << std::endl;
@@ -644,10 +656,10 @@ int DataProperty::generateSaverInstanceSave(std::ostream& ofs, const Klass& onCl
     std::string propType = rdfCppType.second.empty() ? "autordf::PropertyValue" : rdfCppType.second;
 
 	indent(ofs, 2) << "{ // " << currentClassName << " " << storageClassName << "::" << _decorated.prettyIRIName() << std::endl;
-	if (_decorated.maxCardinality(onClass.decorated()) <= 1) {
-		if (_decorated.minCardinality(onClass.decorated()) > 0) {
+	if (_decorated.maxCardinality(storageClass.decorated()) <= 1) {
+		if (_decorated.minCardinality(storageClass.decorated()) > 0) {
 			indent(ofs, 3) << "uint64_t i=1;" << std::endl;
-			indent(ofs, 3) << "auto const& objV = obj." << _decorated.prettyIRIName() << "());" << std::endl;
+			indent(ofs, 3) << "auto const& objV = obj." << _decorated.prettyIRIName() << "();" << std::endl;
 			indent(ofs, 3) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
 			indent(ofs, 4) << "if (objV == v) {" << std::endl;
 			indent(ofs, 5) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = i;" << std::endl;
@@ -670,20 +682,25 @@ int DataProperty::generateSaverInstanceSave(std::ostream& ofs, const Klass& onCl
 			indent(ofs, 3) << "}" << std::endl;
 		}
 	} else {  // maxCardinality > 1
-		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = " << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.size();" << std::endl;
-		indent(ofs, 3) << "uint64_t j=0;" << std::endl;
-		indent(ofs, 3) << "for(auto const& p: obj." << _decorated.prettyIRIName() << "List()) {" << std::endl;
-			indent(ofs, 4) << "uint64_t i=1;" << std::endl;
-			indent(ofs, 4) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
-				indent(ofs, 5) << "if (p == v) {" << std::endl;
-					indent(ofs, 6) << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.push_back(i);" << std::endl;
-					indent(ofs, 6) << "break;" << std::endl;
-				indent(ofs, 5) << "}" << std::endl;
-				indent(ofs, 5) << "i++;" << std::endl;
-			indent(ofs, 4) << "}" << std::endl;
-			indent(ofs, 4) << "j++;" << std::endl;
+	    indent(ofs, 3) << "if(obj." << _decorated.prettyIRIName() << "List().empty()) {" << std::endl;
+	        indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = 0;" << std::endl;
+	        indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1) << "] = 0;" << std::endl;
+        indent(ofs, 3) << "} else {" << std::endl;
+            indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << propOffset << "] = " << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.size();" << std::endl;
+            indent(ofs, 4) << "uint64_t j=0;" << std::endl;
+            indent(ofs, 4) << "for(auto const& p: obj." << _decorated.prettyIRIName() << "List()) {" << std::endl;
+                indent(ofs, 5) << "uint64_t i=1;" << std::endl;
+                indent(ofs, 5) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
+                    indent(ofs, 6) << "if (p == v) {" << std::endl;
+                        indent(ofs, 7) << storageClassName << "_" << _decorated.prettyIRIName() << "_ARR.push_back(i);" << std::endl;
+                        indent(ofs, 7) << "break;" << std::endl;
+                    indent(ofs, 6) << "}" << std::endl;
+                    indent(ofs, 6) << "i++;" << std::endl;
+                indent(ofs, 5) << "}" << std::endl;
+                indent(ofs, 5) << "j++;" << std::endl;
+            indent(ofs, 4) << "}" << std::endl;
+            indent(ofs, 4) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1)  << "] = j;" << std::endl;
 		indent(ofs, 3) << "}" << std::endl;
-		indent(ofs, 3) << currentClassName << "_INSTANCES[identity + " << (propOffset + 1)  << "] = j;" << std::endl;
 	}
 	indent(ofs, 2) << "}" << std::endl;
 	return propOffset + storageSize(onClass);
@@ -700,7 +717,7 @@ void DataProperty::generateSaverGenLoaderData(std::ostream& ofs, const Klass& on
     	indent(ofs, 1) << "ofs << \"static " << rdfCppType.second << " " << storageClassName << "_S_" << _decorated.prettyIRIName() << "[] = {\" << std::endl;" << std::endl;
     	indent(ofs, 1) << "ofs << " << getRdfCppNullValue(onClass) << " << std::endl;" << std::endl;
     	indent(ofs, 1) << "for (auto const& v: " << storageClassName << "_" << name() << "_values) {" << std::endl;
-    	indent(ofs, 2) << "ofs << \", \" << toLiteral(v) << std::endl;" << std::endl;
+       indent(ofs, 2) << "ofs << \", \" << " << genToLiteral(onClass) << " << std::endl;" << std::endl;
     	indent(ofs, 1) << "}" << std::endl;
     	indent(ofs, 1) << "ofs << \"};\" << std::endl;" << std::endl;
 	} else {

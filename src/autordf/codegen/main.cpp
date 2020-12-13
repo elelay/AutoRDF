@@ -96,6 +96,7 @@ void genSaver(ontology::Ontology& ontology, std::set<std::string> cppNameSpaces,
 			   "	std::string newString(v);\n"
 			   "	replaceAll(newString, \"\\\\\", \"\\\\\\\\\");\n"
 			   "	replaceAll(newString, \"\\\"\", \"\\\\\\\"\");\n"
+			   "	replaceAll(newString, \"\\n\", \"\\\\n\");\n"
 			   "	return std::string(\"\\\"\") + newString + std::string(\"\\\"\");\n"
 			   "}\n";
 
@@ -145,7 +146,7 @@ void genSaver(ontology::Ontology& ontology, std::set<std::string> cppNameSpaces,
 			   "}\n";
 
 		ofs << "std::string Saver::toLiteral(const boost::posix_time::ptime& v) {\n"
-			   "	return autordf::cvt::toRdf<boost::posix_time::ptime, autordf::cvt::RdfTypeEnum::xsd_dateTimeStamp>::val(v);\n"
+			   "	return toLiteral(autordf::cvt::toRdf<boost::posix_time::ptime, autordf::cvt::RdfTypeEnum::xsd_dateTimeStamp>::val(v));\n"
 			   "}\n";
 
 

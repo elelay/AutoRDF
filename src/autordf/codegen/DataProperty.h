@@ -62,6 +62,8 @@ private:
 
     void generateStorage(std::ostream& ofs, const Klass& onClass, bool optional, bool forMany) const;
 
+    std::string genToLiteral(const Klass& onClass) const;
+
     std::string orderedBoolValue() const;
 };
 
